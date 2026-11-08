@@ -1,0 +1,81 @@
+package com.x.contact.db.entity;
+
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.x.contact.db.enums.Sex;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.experimental.Accessors;
+
+import java.time.LocalDateTime;
+
+/**
+ * @author : xuemingqi
+ * @since : 2023/1/8 9:59
+ */
+@Data
+@Builder
+@Accessors(chain = true)
+@AllArgsConstructor
+@NoArgsConstructor
+@TableName("user")
+public class User {
+
+    /**
+     * 用户ID
+     */
+    @TableId("id")
+    private Long id;
+
+    /**
+     * 姓名
+     */
+    @TableField("name")
+    private String name;
+
+    /**
+     * 性别
+     */
+    @TableField("sex")
+    private Sex sex;
+
+    /**
+     * 手机号
+     */
+    @TableField("mobile")
+    private String mobile;
+
+    /**
+     * 是否为可管理公共资源的系统管理员，默认否。
+     */
+    @TableField("is_admin")
+    private Boolean isAdmin;
+
+    /**
+     * 密码
+     */
+    @TableField("password")
+    private String password;
+
+    /**
+     * 盐
+     */
+    @TableField("salt")
+    private String salt;
+
+    /**
+     * 更新时间
+     */
+    @TableField("update_time")
+    private LocalDateTime updateTime;
+
+    /**
+     * 创建时间
+     */
+    @TableField("create_time")
+    private LocalDateTime createTime;
+
+}

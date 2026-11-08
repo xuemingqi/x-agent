@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0d12" />
+    <script>
+      (() => {
+        const storedColorMode = localStorage.getItem('x-ai-color-mode');
+        const colorMode = storedColorMode === 'light' || storedColorMode === 'dark'
+          ? storedColorMode
+          : window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.classList.toggle('dark', colorMode === 'dark');
+        document.documentElement.dataset.theme = colorMode;
+        document.querySelector('meta[name="theme-color"]')
+          ?.setAttribute('content', colorMode === 'dark' ? '#0b0d12' : '#f7f8fc');
+      })();
+    </script>
+    <title>X Agent</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

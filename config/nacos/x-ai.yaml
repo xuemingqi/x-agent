@@ -1,0 +1,99 @@
+# X Agent: import into your project namespace, DEFAULT_GROUP.
+# ${...} values are resolved from the service process environment.
+---
+server:
+  port: "${X_AGENT_AI_PORT:18086}"
+  servlet:
+    context-path: "/ai"
+spring:
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:x_agent}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username: "${MYSQL_USERNAME}"
+    password: "${MYSQL_PASSWORD}"
+    hikari:
+      pool-name: x-ai
+      minimum-idle: 1
+      maximum-pool-size: 10
+      connection-timeout: 10000
+  redis:
+    redisson:
+      type: SINGLE
+      single:
+        address: "${REDIS_ADDRESS:redis://127.0.0.1:6379}"
+        password: "${REDIS_PASSWORD:}"
+        timeout: 3000
+        connect-timeout: 3000
+        connectionPoolSize: 20
+        connectionMinimumIdleSize: 2
+        idleConnectionTimeout: 10000
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 500MB
+  quartz:
+    job-store-type: jdbc
+    jdbc:
+      initialize-schema: never
+    wait-for-jobs-to-complete-on-shutdown: true
+    properties:
+      org.quartz.scheduler.instanceName: x-agent-scheduler
+      org.quartz.scheduler.instanceId: AUTO
+      org.quartz.jobStore.isClustered: true
+      org.quartz.jobStore.tablePrefix: AGENT_QRTZ_
+      org.quartz.jobStore.useProperties: true
+id-worker:
+  workerId: "${ID_WORKER_ID:1}"
+  dataCenterId: 3
+minio:
+  endpoint: "${MINIO_ENDPOINT:http://127.0.0.1:9000}"
+  access-key: "${MINIO_ACCESS_KEY}"
+  secret-key: "${MINIO_SECRET_KEY}"
+  bucket: "${MINIO_BUCKET:x-agent}"
+  object-prefix: x-agent/sandbox-snapshots
+  create-bucket-if-absent: true
+agent:
+  name: x-agent
+  workspace: "${AGENT_WORKSPACE:.agentscope/workspace}"
+  sandbox:
+    image: "${AGENT_SANDBOX_IMAGE:x-agent-sandbox:1.0.0}"
+    network: "${AGENT_SANDBOX_NETWORK:bridge}"
+    workspace-root: "/workspace"
+    cpu-count: 2
+    memory-size-bytes: 2147483648
+  compaction:
+    trigger-ratio: 0.9
+    keep-ratio: 0.2
+  approval:
+    max-consecutive-approvals: 8
+  streaming:
+    blocking-timeout: 10m
+  skill:
+    database-name: "${MYSQL_DATABASE:x_agent}"
+    table-name: agent_public_skill
+    resource-table-name: agent_public_skill_resource
+  public-knowledge:
+    directory: "${AGENT_PUBLIC_KNOWLEDGE_DIRECTORY:.agentscope/public-knowledge}"
+  user-workspace:
+    directory: "${AGENT_USER_WORKSPACE_DIRECTORY:.agentscope/user-workspaces}"
+    max-upload-size-bytes: 104857600
+  schedule:
+    default-zone-id: Asia/Shanghai
+    execution-locale: zh-CN
+    quartz:
+      scheduler-type: quartz
+  interrupt:
+    topic: x-agent:interrupt
+  browser-screenshot:
+    request-timeout-seconds: 180
+    heartbeat-interval-seconds: 15
+    max-reason-length: 1000
+  multimodal:
+    max-image-size-bytes: 10485760
+    image-hosts: []
+  external-access:
+    http-api-url: "${AGENT_HTTP_API_URL:http://127.0.0.1:18081/ai/open/chat/run}"
+    mcp-server-url: "${AGENT_MCP_SERVER_URL:http://127.0.0.1:18081/mcp}"

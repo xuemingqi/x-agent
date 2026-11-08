@@ -1,0 +1,29 @@
+# X Agent: import into your project namespace, DEFAULT_GROUP.
+# ${...} values are resolved from the service process environment.
+---
+server:
+  port: "${X_AGENT_MCP_RUNTIME_PORT:18087}"
+  servlet:
+    context-path: "/mcp"
+spring:
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${MYSQL_HOST:127.0.0.1}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:x_agent}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username: "${MYSQL_USERNAME}"
+    password: "${MYSQL_PASSWORD}"
+    hikari:
+      pool-name: x-ai-mcp-runtime
+      minimum-idle: 1
+      maximum-pool-size: 10
+      connection-timeout: 10000
+id-worker:
+  workerId: "${ID_WORKER_ID:1}"
+  dataCenterId: 4
+mcp:
+  runtime:
+    proxy-endpoint: "/internal/mcp"
+    timeout-buffer-seconds: 1
+    data-directory: "${MCP_RUNTIME_DATA_DIRECTORY:.x-ai-mcp}"

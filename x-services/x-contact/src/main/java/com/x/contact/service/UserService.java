@@ -1,0 +1,40 @@
+package com.x.contact.service;
+
+
+import com.x.framework.common.response.BaseResult;
+import com.x.api.contact.domain.UserDo;
+import com.x.api.contact.dto.CreateUserDto;
+import com.x.api.contact.dto.UserAuthDto;
+
+/**
+ * @author : xuemingqi
+ * @since : 2023/1/8 16:50
+ */
+public interface UserService {
+
+    /**
+     * 按可信用户 ID 查询基本信息和管理员标志，供内部服务校验权限。
+     */
+    BaseResult<UserDo> getUserById(Long id);
+
+    /**
+     * 根据用户id获取用户信息
+     *
+     * @param mobile 用户手机号
+     */
+    BaseResult<UserDo> getOneUser(String mobile);
+
+    /**
+     * 验证用户合法性
+     *
+     * @param param 用户信息
+     */
+    BaseResult<Long> userAuth(UserAuthDto param);
+
+    /**
+     * 创建用户
+     *
+     * @param param 用户信息
+     */
+    BaseResult<Void> createUser(CreateUserDto param);
+}

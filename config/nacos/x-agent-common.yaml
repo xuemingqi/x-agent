@@ -1,0 +1,18 @@
+# X Agent: import into your project namespace, DEFAULT_GROUP.
+# ${...} values are resolved from the service process environment.
+---
+x:
+  security:
+    internal-secret: "${X_AGENT_INTERNAL_SECRET}"
+logging:
+  level:
+    com.alibaba.nacos.client.config.impl: WARN
+spring:
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            connectTimeout: 5000
+            readTimeout: 30000
+            loggerLevel: none

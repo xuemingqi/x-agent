@@ -1,0 +1,114 @@
+# X Agent: import into your project namespace, DEFAULT_GROUP.
+# ${...} values are resolved from the service process environment.
+---
+server:
+  port: "${X_AGENT_GATEWAY_PORT:18081}"
+spring:
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: false
+      server:
+        webflux:
+          discovery:
+            locator:
+              enabled: false
+          httpclient:
+            connect-timeout: 5000
+            response-timeout: PT30S
+          routes:
+          - id: x-auth
+            uri: lb://x-auth
+            predicates:
+            - Path=/auth/**
+          - id: x-contact
+            uri: lb://x-contact
+            predicates:
+            - Path=/contact/**
+          - id: x-ai
+            uri: lb://x-ai
+            predicates:
+            - Path=/ai/**
+            metadata:
+              response-timeout: -1
+          - id: x-ai-mcp-gateway
+            uri: lb://x-ai-mcp-gateway
+            predicates:
+            - Path=/mcp,/mcp/**
+            metadata:
+              response-timeout: -1
+    sentinel:
+      eager: true
+      web-context-unify: true
+      datasource:
+        flow:
+          nacos:
+            server-addr: "${nacos.server-addr}"
+            namespace: "${nacos.namespace}"
+            username: "${nacos.username}"
+            password: "${nacos.password}"
+            dataId: x-gateway-flow-rules
+            groupId: SENTINEL_GROUP
+            rule-type: flow
+            data-type: json
+        degrade:
+          nacos:
+            server-addr: "${nacos.server-addr}"
+            namespace: "${nacos.namespace}"
+            username: "${nacos.username}"
+            password: "${nacos.password}"
+            dataId: x-gateway-degrade-rules
+            groupId: SENTINEL_GROUP
+            rule-type: degrade
+            data-type: json
+        authority:
+          nacos:
+            server-addr: "${nacos.server-addr}"
+            namespace: "${nacos.namespace}"
+            username: "${nacos.username}"
+            password: "${nacos.password}"
+            dataId: x-gateway-authority-rules
+            groupId: SENTINEL_GROUP
+            rule-type: authority
+            data-type: json
+        system:
+          nacos:
+            server-addr: "${nacos.server-addr}"
+            namespace: "${nacos.namespace}"
+            username: "${nacos.username}"
+            password: "${nacos.password}"
+            dataId: x-gateway-system-rules
+            groupId: SENTINEL_GROUP
+            rule-type: system
+            data-type: json
+        param:
+          nacos:
+            server-addr: "${nacos.server-addr}"
+            namespace: "${nacos.namespace}"
+            username: "${nacos.username}"
+            password: "${nacos.password}"
+            dataId: x-gateway-param-rules
+            groupId: SENTINEL_GROUP
+            rule-type: param-flow
+            data-type: json
+knife4j:
+  gateway:
+    enabled: true
+    strategy: manual
+    routes:
+    - name: x-auth
+      service-name: x-auth
+      url: "/auth/v3/api-docs"
+      context-path: "/auth"
+      order: 0
+    - name: x-contact
+      service-name: x-contact
+      url: "/contact/v3/api-docs"
+      context-path: "/contact"
+      order: 1
+    - name: x-ai
+      service-name: x-ai
+      url: "/ai/v3/api-docs"
+      context-path: "/ai"
+      order: 2
