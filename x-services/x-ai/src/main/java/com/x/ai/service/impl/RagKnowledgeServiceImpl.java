@@ -1,6 +1,5 @@
 package com.x.ai.service.impl;
 
-import com.x.ai.common.constants.KnowledgeConstant;
 import com.x.ai.common.domain.KnowledgeChunkPageDo;
 import com.x.ai.common.domain.KnowledgeDocumentDo;
 import com.x.ai.common.domain.KnowledgeDownloadDo;
@@ -143,14 +142,14 @@ public class RagKnowledgeServiceImpl implements RagKnowledgeService {
     }
 
     @Override
-    public List<KnowledgeSearchResultDo> search(String userId, String query, int limit, boolean includePublic) {
-        List<String> owners = includePublic ? List.of(userId, KnowledgeConstant.PUBLIC_OWNER) : List.of(userId);
-        return retrieve(owners, query, limit);
-    }
-
-    @Override
-    public List<KnowledgeSearchResultDo> searchPublic(String query, int limit) {
-        return retrieve(List.of(KnowledgeConstant.PUBLIC_OWNER), query, limit);
+    public List<KnowledgeSearchResultDo> search(String userId, String query, int limit) {
+        if (query == null || query.isBlank() || query.length() > MAX_QUERY_CHARACTERS
+                || limit < 1 || limit > MAX_SEARCH_RESULTS) {
+            throw new XException(ResponseCodeEnum.AGENT_KNOWLEDGE_SEARCH_INVALID);
+        }
+        List<Double> embedding = embeddingService.embed(List.of(query.strip())).getFirst();
+        return storage(() -> documents.search(userId, embedding, embeddingProperties.getModel(),
+                embeddingProperties.getDimensions(), properties.getMinScore(), limit));
     }
 
     /**
@@ -181,18 +180,6 @@ public class RagKnowledgeServiceImpl implements RagKnowledgeService {
     }
 
     /**
-     * 查询和文档共用模型及维度，仅在指定所有者集合中召回。
-     */
-    private List<KnowledgeSearchResultDo> retrieve(List<String> owners, String query, int limit) {
-        if (query == null || query.isBlank() || query.length() > MAX_QUERY_CHARACTERS || limit < 1 || limit > MAX_SEARCH_RESULTS) {
-            throw new XException(ResponseCodeEnum.AGENT_KNOWLEDGE_SEARCH_INVALID);
-        }
-        List<Double> embedding = embeddingService.embed(List.of(query.strip())).getFirst();
-        return storage(() -> documents.search(owners, embedding, embeddingProperties.getModel(),
-                embeddingProperties.getDimensions(), properties.getMinScore(), limit));
-    }
-
-    /**
      * 索引并发被替换时返回最新状态，被删除时保持不存在，禁止复活旧版本。
      */
     private KnowledgeDocumentDo currentDocument(KnowledgeDocument document) {
@@ -209,7 +196,7 @@ public class RagKnowledgeServiceImpl implements RagKnowledgeService {
     }
 
     /**
-     * 保留相对路径兼容公共文本写入，拒绝绝对路径、回退和空片段。
+     * 规范化文档相对路径，拒绝绝对路径、回退和空片段。
      */
     private String validPath(String path) {
         if (path == null || path.isBlank() || path.length() > MAX_PATH_CHARACTERS

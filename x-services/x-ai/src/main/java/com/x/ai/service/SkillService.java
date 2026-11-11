@@ -3,7 +3,6 @@ package com.x.ai.service;
 import com.x.ai.common.domain.SkillDo;
 import com.x.ai.common.dto.UserSkillCreateDto;
 import com.x.ai.common.dto.UserSkillUpdateDto;
-import com.x.ai.common.enums.SkillScope;
 import com.x.ai.common.enums.SkillArchiveFormat;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -12,27 +11,25 @@ import java.util.List;
 public interface SkillService {
 
     /**
-     * 保存当前用户对指定可见资源的启用偏好，不修改公共资源及分享状态。
+     * 保存当前用户对指定可见资源的启用偏好，仅作用于自己拥有的 Skill。
      */
-    boolean setEnabled(SkillScope scope, String name, boolean enabled);
+    boolean setEnabled(String name, boolean enabled);
 
 
     /**
-     * 查询当前用户可见的公共和用户 Skill。
+     * 查询当前用户拥有的 Skill。
      *
-     * @param scope 可选作用域，为空时返回全部
      * @return Skill 列表
      */
-    List<SkillDo> list(SkillScope scope);
+    List<SkillDo> list();
 
     /**
-     * 查询指定作用域的 Skill 详情。
+     * 查询自己拥有的 Skill 详情。
      *
-     * @param scope Skill 作用域
      * @param name  Skill 名称
      * @return Skill 详情
      */
-    SkillDo get(SkillScope scope, String name);
+    SkillDo get(String name);
 
     /**
      * 在数据库中创建当前用户的个人 Skill。
@@ -67,5 +64,5 @@ public interface SkillService {
     /**
      * 导出当前用户可见的指定 Skill 及其全部资源。
      */
-    byte[] exportArchive(SkillScope scope, String name, SkillArchiveFormat format);
+    byte[] exportArchive(String name, SkillArchiveFormat format);
 }

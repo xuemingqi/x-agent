@@ -49,12 +49,6 @@ public class User {
     private String mobile;
 
     /**
-     * 是否为可管理公共资源的系统管理员，默认否。
-     */
-    @TableField("is_admin")
-    private Boolean isAdmin;
-
-    /**
      * 密码
      */
     @TableField("password")

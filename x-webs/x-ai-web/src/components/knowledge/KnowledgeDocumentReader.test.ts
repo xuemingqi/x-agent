@@ -4,18 +4,16 @@ import { createApp, defineComponent, h, nextTick, ref } from 'vue';
 
 import {
   downloadKnowledgeDocument,
-  downloadPublicKnowledgeDocument,
   getKnowledgeDocumentPreview,
   listKnowledgeDocumentChunks,
 } from '@/api/knowledge';
-import type { KnowledgeDocument, KnowledgeScope } from '@/types/knowledge';
+import type { KnowledgeDocument } from '@/types/knowledge';
 import KnowledgeDocumentReader from './KnowledgeDocumentReader.vue';
 
 vi.mock('@/api/knowledge', () => ({
   getKnowledgeDocumentPreview: vi.fn(),
   listKnowledgeDocumentChunks: vi.fn(),
   downloadKnowledgeDocument: vi.fn(),
-  downloadPublicKnowledgeDocument: vi.fn(),
 }));
 
 const cleanups: (() => void)[] = [];
@@ -44,12 +42,11 @@ afterEach(() => {
 });
 
 function mount(initialTab: 'preview' | 'chunks' = 'preview', initialChunkIndex?: number, document = file) {
-  const scope = ref<KnowledgeScope>('user');
   const onClose = vi.fn();
   const currentDocument = ref({ ...document });
   const container = window.document.createElement('div');
   const app = createApp({
-    render: () => h(KnowledgeDocumentReader, { document: currentDocument.value, scope: scope.value, initialTab, initialChunkIndex, onClose }),
+    render: () => h(KnowledgeDocumentReader, { document: currentDocument.value, initialTab, initialChunkIndex, onClose }),
   });
   const wrapper = defineComponent({ setup: (_, { slots }) => () => h('div', slots.default?.()) });
   for (const name of ['el-icon', 'el-empty']) app.component(name, wrapper);
@@ -61,7 +58,7 @@ function mount(initialTab: 'preview' | 'chunks' = 'preview', initialChunkIndex?:
   app.directive('loading', {});
   app.mount(container);
   cleanups.push(() => app.unmount());
-  return { container, scope, currentDocument, onClose };
+  return { container, currentDocument, onClose };
 }
 
 function click(container: HTMLElement, label: string): void {
@@ -77,34 +74,33 @@ describe('knowledge document preview', () => {
     const { container } = mount();
     await vi.waitFor(() => expect(container.querySelector('pre')?.textContent).toContain('<script>'));
     expect(container.querySelector('script, img')).toBeNull();
-    expect(getKnowledgeDocumentPreview).toHaveBeenCalledWith('guide.pdf', 'user');
+    expect(getKnowledgeDocumentPreview).toHaveBeenCalledWith('guide.pdf');
   });
 
-  it('discards a private preview that completes after switching to public knowledge', async () => {
+  it('discards an older preview after selecting a different document', async () => {
     let finish!: (value: Awaited<ReturnType<typeof getKnowledgeDocumentPreview>>) => void;
     vi.mocked(getKnowledgeDocumentPreview)
       .mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }))
-      .mockResolvedValueOnce({ path: file.path, name: file.name, content: '公共正文', contentType: 'text/plain' });
-    const { container, scope } = mount();
-    scope.value = 'public';
-    await vi.waitFor(() => expect(container.querySelector('pre')?.textContent).toBe('公共正文'));
+      .mockResolvedValueOnce({ path: file.path, name: file.name, content: '新文档正文', contentType: 'text/plain' });
+    const { container, currentDocument } = mount();
+    currentDocument.value = { ...file, path: 'new.pdf' };
+    await vi.waitFor(() => expect(container.querySelector('pre')?.textContent).toBe('新文档正文'));
     finish({ path: file.path, name: file.name, content: '私有正文', contentType: 'text/plain' });
     await nextTick();
     await nextTick();
-    expect(container.querySelector('pre')?.textContent).toBe('公共正文');
+    expect(container.querySelector('pre')?.textContent).toBe('新文档正文');
   });
 
-  it('downloads a PDF through the authenticated API and revokes its preview URL on scope changes', async () => {
+  it('downloads a PDF through the authenticated API and revokes its URL when documents change', async () => {
     vi.mocked(downloadKnowledgeDocument).mockResolvedValue(new Blob(['%PDF']));
-    vi.mocked(downloadPublicKnowledgeDocument).mockResolvedValue(new Blob(['%PDF-public']));
-    const { container, scope } = mount();
+    const { container, currentDocument } = mount();
     click(container, '查看原始 PDF');
     await vi.waitFor(() => expect(container.querySelector('iframe')?.getAttribute('src')).toBe('blob:authenticated-pdf'));
     expect(downloadKnowledgeDocument).toHaveBeenCalledWith('guide.pdf');
-    scope.value = 'public';
+    currentDocument.value = { ...file, path: 'new.pdf' };
     await nextTick();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:authenticated-pdf');
-    expect(downloadPublicKnowledgeDocument).toHaveBeenCalledWith('guide.pdf');
+    expect(downloadKnowledgeDocument).toHaveBeenCalledWith('new.pdf');
   });
 
   it('loads chunk pages on demand without truncating the displayed chunk content', async () => {
@@ -120,7 +116,7 @@ describe('knowledge document preview', () => {
     await vi.waitFor(() => expect(container.querySelector('.chunk-card pre')?.textContent).toBe('第一个切片'));
     click(container, '下一页');
     await vi.waitFor(() => expect(container.querySelector('.chunk-card pre')?.textContent).toBe('完整切片正文\n第二行'));
-    expect(listKnowledgeDocumentChunks).toHaveBeenLastCalledWith('guide.pdf', 'user', 2, 20);
+    expect(listKnowledgeDocumentChunks).toHaveBeenLastCalledWith('guide.pdf', 2, 20);
     expect(container.querySelector('.chunk-card strong')?.textContent).toBe('切片 21');
   });
 
@@ -130,7 +126,7 @@ describe('knowledge document preview', () => {
     });
     const { container } = mount('chunks', 23);
     await vi.waitFor(() => expect(container.querySelector('.chunk-card.matched pre')?.textContent).toBe('命中的文档片段'));
-    expect(listKnowledgeDocumentChunks).toHaveBeenCalledWith('guide.pdf', 'user', 2, 20);
+    expect(listKnowledgeDocumentChunks).toHaveBeenCalledWith('guide.pdf', 2, 20);
   });
 
   it('renders as a named page region and exposes a back action without a modal drawer', async () => {

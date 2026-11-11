@@ -7,35 +7,28 @@ import type {
   KnowledgeLinkFolderPayload,
   KnowledgeLinkPayload,
   KnowledgePreview,
-  KnowledgeScope,
   KnowledgeSearchResult,
 } from '@/types/knowledge';
 
-function documentUrl(scope: KnowledgeScope): string {
-  return scope === 'public' ? '/administration/knowledge/documents' : '/knowledge/documents';
+export function getKnowledgeDocumentPreview(path: string): Promise<KnowledgePreview> {
+  return request<KnowledgePreview>({ url: '/knowledge/documents/preview', method: 'GET', params: { path } });
 }
 
-export function getKnowledgeDocumentPreview(path: string, scope: KnowledgeScope): Promise<KnowledgePreview> {
-  return request<KnowledgePreview>({ url: `${documentUrl(scope)}/preview`, method: 'GET', params: { path } });
-}
-
-export function listKnowledgeDocumentChunks(path: string, scope: KnowledgeScope,
-  page = 1, size = 20): Promise<KnowledgeChunkPage> {
+export function listKnowledgeDocumentChunks(path: string, page = 1, size = 20): Promise<KnowledgeChunkPage> {
   return request<KnowledgeChunkPage>({
-    url: `${documentUrl(scope)}/chunks`, method: 'GET', params: { path, page, size },
+    url: '/knowledge/documents/chunks', method: 'GET', params: { path, page, size },
   });
 }
 
-export function reindexKnowledgeDocument(path: string, scope: KnowledgeScope): Promise<KnowledgeDocument> {
+export function reindexKnowledgeDocument(path: string): Promise<KnowledgeDocument> {
   return request<KnowledgeDocument>({
-    url: `${documentUrl(scope)}/reindex`, method: 'POST', params: { path }, timeout: 300000,
+    url: '/knowledge/documents/reindex', method: 'POST', params: { path }, timeout: 300000,
   });
 }
 
-export function searchKnowledgeDocuments(query: string, scope: KnowledgeScope,
-  limit = 6): Promise<KnowledgeSearchResult[]> {
+export function searchKnowledgeDocuments(query: string, limit = 6): Promise<KnowledgeSearchResult[]> {
   return request<KnowledgeSearchResult[]>({
-    url: `${documentUrl(scope)}/search`, method: 'POST', data: { query, limit }, timeout: 300000,
+    url: '/knowledge/documents/search', method: 'POST', data: { query, limit }, timeout: 300000,
   });
 }
 
@@ -112,68 +105,4 @@ export function renameKnowledgeLinkFolder(id: string, name: string): Promise<Kno
 
 export function deleteKnowledgeLinkFolder(id: string): Promise<boolean> {
   return request<boolean>({ url: `/knowledge/link-folders/${encodeURIComponent(id)}`, method: 'DELETE' });
-}
-
-export function listPublicKnowledgeDocuments(): Promise<KnowledgeDocument[]> {
-  return request<KnowledgeDocument[]>({ url: '/administration/knowledge/documents', method: 'GET' });
-}
-
-export function uploadPublicKnowledgeDocuments(files: File[]): Promise<KnowledgeDocument[]> {
-  const data = new FormData();
-  files.forEach((file) => data.append('files', file));
-  return request<KnowledgeDocument[]>({
-    url: '/administration/knowledge/documents', method: 'POST', data, timeout: 300000,
-  });
-}
-
-export function downloadPublicKnowledgeDocument(path: string): Promise<Blob> {
-  return requestBlob({
-    url: '/administration/knowledge/documents/download', method: 'GET', params: { path }, timeout: 300000,
-  });
-}
-
-export function deletePublicKnowledgeDocument(path: string): Promise<boolean> {
-  return request<boolean>({ url: '/administration/knowledge/documents', method: 'DELETE', params: { path } });
-}
-
-export function listPublicKnowledgeLinks(): Promise<KnowledgeLink[]> {
-  return request<KnowledgeLink[]>({ url: '/administration/knowledge/links', method: 'GET' });
-}
-
-export function createPublicKnowledgeLink(payload: KnowledgeLinkPayload): Promise<KnowledgeLink> {
-  return request<KnowledgeLink>({ url: '/administration/knowledge/links', method: 'POST', data: payload });
-}
-
-export function updatePublicKnowledgeLink(id: string, payload: KnowledgeLinkPayload): Promise<KnowledgeLink> {
-  return request<KnowledgeLink>({
-    url: `/administration/knowledge/links/${encodeURIComponent(id)}`, method: 'PUT', data: payload,
-  });
-}
-
-export function deletePublicKnowledgeLink(id: string): Promise<boolean> {
-  return request<boolean>({
-    url: `/administration/knowledge/links/${encodeURIComponent(id)}`, method: 'DELETE',
-  });
-}
-
-export function listPublicKnowledgeLinkFolders(): Promise<KnowledgeLinkFolder[]> {
-  return request<KnowledgeLinkFolder[]>({ url: '/administration/knowledge/link-folders', method: 'GET' });
-}
-
-export function createPublicKnowledgeLinkFolder(payload: KnowledgeLinkFolderPayload): Promise<KnowledgeLinkFolder> {
-  return request<KnowledgeLinkFolder>({
-    url: '/administration/knowledge/link-folders', method: 'POST', data: payload,
-  });
-}
-
-export function renamePublicKnowledgeLinkFolder(id: string, name: string): Promise<KnowledgeLinkFolder> {
-  return request<KnowledgeLinkFolder>({
-    url: `/administration/knowledge/link-folders/${encodeURIComponent(id)}`, method: 'PUT', data: { name },
-  });
-}
-
-export function deletePublicKnowledgeLinkFolder(id: string): Promise<boolean> {
-  return request<boolean>({
-    url: `/administration/knowledge/link-folders/${encodeURIComponent(id)}`, method: 'DELETE',
-  });
 }

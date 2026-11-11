@@ -78,56 +78,21 @@ CREATE TABLE IF NOT EXISTS agent_schedule_execution
 )
     comment '定时任务执行记录表' collate = utf8mb4_general_ci;
 
--- AgentScope MysqlSkillRepository compatible schema. Table names are configured by agent.skill.*.
-CREATE TABLE IF NOT EXISTS agent_public_skill
-(
-    id            bigint auto_increment              not null comment '主键 ID'
-        primary key,
-    name          varchar(255)                        not null comment 'Skill 名称',
-    description   text                                not null comment 'Skill 描述',
-    skill_content longtext                            not null comment 'SKILL.md 内容',
-    source        varchar(255)                        not null comment 'Skill 来源',
-    metadata_json longtext                            null comment 'Skill 元数据 JSON',
-    created_at    timestamp default CURRENT_TIMESTAMP not null comment '创建时间',
-    updated_at    timestamp default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
-    constraint uk_agent_public_skill_name
-        unique (name)
-)
-    comment '公共 Skill 表' collate = utf8mb4_general_ci;
-
-CREATE TABLE IF NOT EXISTS agent_public_skill_resource
-(
-    id               bigint                             not null comment '关联的公共 Skill ID',
-    resource_path    varchar(500)                       not null comment 'Skill 资源相对路径',
-    resource_content longtext                           not null comment 'Skill 资源内容',
-    created_at       timestamp default CURRENT_TIMESTAMP not null comment '创建时间',
-    updated_at       timestamp default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
-    primary key (id, resource_path),
-    constraint fk_agent_public_skill_resource
-        foreign key (id) references agent_public_skill (id)
-            on delete cascade
-)
-    comment '公共 Skill 资源表' collate = utf8mb4_general_ci;
-
 CREATE TABLE IF NOT EXISTS agent_knowledge_link_folder
 (
     id            bigint                             not null comment '在线知识库文件夹 ID'
         primary key,
     parent_id     bigint default 0                   not null comment '父文件夹 ID，0 表示根目录',
     name          varchar(256)                       not null comment '文件夹名称',
-    scope         tinyint                            not null comment '作用域：1 公共，2 个人',
-    owner_user_id varchar(128) default ''            not null comment '个人文件夹所属用户 ID，公共文件夹为空字符串',
-    created_by    varchar(128)                       not null comment '创建用户 ID',
+    owner_user_id varchar(128)                       not null comment '所属用户 ID',
     create_time   datetime default CURRENT_TIMESTAMP not null comment '创建时间',
     update_time   datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
-    constraint chk_agent_knowledge_link_folder_scope
-        check (scope in (1, 2)),
     constraint chk_agent_knowledge_link_folder_parent
         check (id > 0 and parent_id >= 0 and id <> parent_id),
     constraint uk_agent_knowledge_link_folder_name
-        unique (scope, owner_user_id, parent_id, name)
+        unique (owner_user_id, parent_id, name)
 )
-    comment '公共和个人在线知识库文件夹表' collate = utf8mb4_general_ci;
+    comment '用户在线知识库文件夹表' collate = utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS agent_knowledge_link
 (
@@ -138,81 +103,18 @@ CREATE TABLE IF NOT EXISTS agent_knowledge_link
     summary       varchar(1000)                      not null comment '文档简短介绍',
     url           varchar(2048)                      not null comment '在线文档链接',
     url_hash      char(64) charset ascii collate ascii_bin not null comment '规范化 URL 的 SHA-256 摘要',
-    scope         tinyint                            not null comment '作用域：1 公共，2 个人',
-    owner_user_id varchar(128) default ''            not null comment '个人链接所属用户 ID，公共链接为空字符串',
+    owner_user_id varchar(128)                       not null comment '所属用户 ID',
     enabled       tinyint      default 1             not null comment '是否启用',
-    created_by    varchar(128)                       not null comment '创建用户 ID',
     create_time   datetime default CURRENT_TIMESTAMP not null comment '创建时间',
     update_time   datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
-    constraint chk_agent_knowledge_link_scope
-        check (scope in (1, 2)),
     constraint chk_agent_knowledge_link_enabled
         check (enabled in (0, 1)),
     constraint uk_agent_knowledge_link_url
-        unique (scope, owner_user_id, url_hash),
-    index idx_agent_knowledge_link_visible (scope, owner_user_id, enabled),
-    index idx_agent_knowledge_link_folder (scope, owner_user_id, folder_id)
+        unique (owner_user_id, url_hash),
+    index idx_agent_knowledge_link_visible (owner_user_id, enabled),
+    index idx_agent_knowledge_link_folder (owner_user_id, folder_id)
 )
-    comment '公共和个人在线知识库链接表' collate = utf8mb4_general_ci;
-
-CREATE TABLE IF NOT EXISTS agent_shared_skill
-(
-    id            bigint                             not null comment '共享 Skill 快照 ID'
-        primary key,
-    owner_user_id varchar(128)                       not null comment '快照创建者用户 ID',
-    name          varchar(64)                        not null comment 'Skill 名称',
-    description   varchar(500)                       not null comment 'Skill 使用场景描述',
-    skill_content longtext                           not null comment '发布时的 SKILL.md 指令正文快照',
-    create_time   datetime default CURRENT_TIMESTAMP not null comment '创建时间',
-    index idx_agent_shared_skill_owner (owner_user_id, create_time)
-)
-    comment '用户分享的不可变 Skill 快照表' collate = utf8mb4_general_ci;
-
-CREATE TABLE IF NOT EXISTS agent_shared_skill_resource
-(
-    id               bigint                             not null comment '资源 ID'
-        primary key,
-    skill_id         bigint                             not null comment '共享 Skill 快照 ID',
-    resource_path    varchar(500)                       not null comment 'Skill 资源相对路径',
-    resource_content longtext                           not null comment 'Skill 资源文本内容',
-    create_time      datetime default CURRENT_TIMESTAMP not null comment '创建时间',
-    constraint uk_agent_shared_skill_resource
-        unique (skill_id, resource_path),
-    constraint fk_agent_shared_skill_resource
-        foreign key (skill_id) references agent_shared_skill (id)
-            on delete cascade
-)
-    comment '共享 Skill 快照资源表' collate = utf8mb4_general_ci;
-
-CREATE TABLE IF NOT EXISTS agent_skill_share
-(
-    id                    bigint                             not null comment '分享邀请 ID'
-        primary key,
-    skill_id              bigint                             not null comment '共享 Skill 快照 ID',
-    sender_user_id        varchar(128)                       not null comment '分享发起人用户 ID',
-    sender_mobile         varchar(32)                        not null comment '发起分享时的发送人手机号',
-    sender_display_name   varchar(255) default null          null comment '发起分享时的发送人姓名',
-    recipient_user_id     varchar(128)                       not null comment '分享接收人用户 ID',
-    recipient_mobile      varchar(32)                        not null comment '发起分享时的接收人手机号',
-    source_skill_name     varchar(64)                        not null comment '发起分享时的个人 Skill 名称',
-    status                tinyint                            not null comment '邀请状态：1 待处理，2 已接受，3 已拒绝',
-    response_time         datetime                           null comment '接受或拒绝时间',
-    accepted_skill_marker varchar(320) generated always as (
-        case when status = 2 then concat(recipient_user_id, '|', source_skill_name) else null end
-    ) stored comment '接收人范围内已接受 Skill 的唯一标记',
-    create_time           datetime default CURRENT_TIMESTAMP not null comment '创建时间',
-    update_time           datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
-    constraint chk_agent_skill_share_status
-        check (status in (1, 2, 3)),
-    constraint uk_agent_skill_share_relation
-        unique (sender_user_id, recipient_user_id, source_skill_name),
-    constraint uk_agent_skill_share_accepted_name
-        unique (accepted_skill_marker),
-    constraint fk_agent_skill_share_skill
-        foreign key (skill_id) references agent_shared_skill (id),
-    index idx_agent_skill_share_recipient_status (recipient_user_id, status, create_time)
-)
-    comment 'Skill 定向分享邀请表' collate = utf8mb4_general_ci;
+    comment '用户在线知识库链接表' collate = utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS agent_conversation
 (
@@ -265,7 +167,7 @@ CREATE TABLE IF NOT EXISTS agent_disabled_resource
     id           char(64) charset ascii collate ascii_bin not null comment '用户与资源键的 SHA-256 摘要'
         primary key,
     user_id      varchar(128) collate utf8mb4_bin         not null comment '关闭扩展的用户 ID',
-    resource_key varchar(256) collate utf8mb4_bin         not null comment 'SKILL:作用域:名称或 MCP:配置 ID',
+    resource_key varchar(256) collate utf8mb4_bin         not null comment 'SKILL:名称',
     create_time  datetime default CURRENT_TIMESTAMP      not null comment '关闭时间',
     constraint uk_agent_disabled_resource
         unique (user_id, resource_key)

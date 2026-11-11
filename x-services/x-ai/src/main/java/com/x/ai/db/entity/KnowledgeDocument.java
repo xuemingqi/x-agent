@@ -12,7 +12,7 @@ import lombok.experimental.Accessors;
 public class KnowledgeDocument {
 
     /**
-     * 文档所有者，公共文档使用平台保留标识。
+     * 文档所属用户 ID。
      */
     private String ownerId;
 

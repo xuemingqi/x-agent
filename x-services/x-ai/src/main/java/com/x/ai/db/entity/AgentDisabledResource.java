@@ -24,7 +24,7 @@ public class AgentDisabledResource {
     private String userId;
 
     /**
-     * 资源键：SKILL:作用域:名称或 MCP:配置 ID。
+     * 资源键：SKILL:名称。
      */
     @TableField("resource_key")
     private String resourceKey;

@@ -1,4 +1,4 @@
--- Identity data needed by AI ownership, login and public-resource administration.
+-- Identity data needed by user ownership and login.
 -- No sample accounts or passwords are included.
 CREATE TABLE IF NOT EXISTS `user`
 (
@@ -6,7 +6,6 @@ CREATE TABLE IF NOT EXISTS `user`
     name        varchar(100)                        NOT NULL,
     sex         tinyint                             DEFAULT NULL,
     mobile      varchar(32)                         NOT NULL,
-    is_admin    tinyint(1)                          NOT NULL DEFAULT 0,
     password    varchar(255)                        NOT NULL,
     salt        varchar(128)                        NOT NULL,
     create_time datetime                            NOT NULL DEFAULT CURRENT_TIMESTAMP,

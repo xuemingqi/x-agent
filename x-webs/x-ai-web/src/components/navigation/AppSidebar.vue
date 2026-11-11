@@ -16,13 +16,12 @@ import {
   SwitchButton,
 } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { logout } from '@/api/auth';
 import DeveloperAccessDialog from '@/components/developer/DeveloperAccessDialog.vue';
 import { useChatStore } from '@/stores/chat';
-import { useAdministrationStore } from '@/stores/administration';
 import { useModelSettingStore } from '@/stores/model-setting';
 import { clearToken } from '@/utils/auth';
 import { currentColorMode, toggleColorMode } from '@/utils/colorMode';
@@ -33,19 +32,10 @@ const emit = defineEmits<{ close: [] }>();
 const route = useRoute();
 const router = useRouter();
 const chat = useChatStore();
-const administration = useAdministrationStore();
 const modelSetting = useModelSettingStore();
 const userMenuVisible = ref(false);
 const developerAccessDialogVisible = ref(false);
 const isChatPage = computed(() => route.name === 'chat');
-
-onMounted(async () => {
-  try {
-    await administration.load();
-  } catch {
-    // 管理员状态不可用时仅隐藏管理员入口，不影响当前用户信息。
-  }
-});
 
 async function signOut(): Promise<void> {
   userMenuVisible.value = false;
@@ -56,7 +46,6 @@ async function signOut(): Promise<void> {
   } finally {
     clearToken();
     modelSetting.reset();
-    administration.reset();
     chat.reset();
     await router.replace('/login');
   }
@@ -209,7 +198,7 @@ async function removeConversation(sessionId: string): Promise<void> {
           <div class="user-avatar">U</div>
           <div class="user-card-copy">
             <strong>当前用户</strong>
-            <span>在线{{ administration.isAdministrator ? ' · 管理员' : '' }}</span>
+            <span>在线</span>
           </div>
           <el-icon class="user-card-arrow" :class="{ expanded: userMenuVisible }"><ArrowUp /></el-icon>
         </button>
@@ -220,10 +209,7 @@ async function removeConversation(sessionId: string): Promise<void> {
           <div class="user-avatar">U</div>
           <div>
             <strong>当前用户</strong>
-            <span>
-              已登录
-              {{ administration.isAdministrator ? ' · 管理员' : '' }}
-            </span>
+            <span>已登录</span>
           </div>
         </div>
         <div class="user-menu-divider" />

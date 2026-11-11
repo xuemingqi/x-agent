@@ -26,7 +26,6 @@ import type { ConversationFile } from '@/types/chat';
 import { supportsImageInput, supportsImageOutput } from '@/types/model';
 import type { AgentModel } from '@/types/model';
 import { isImageFile } from '@/utils/conversation-file';
-import { SKILL_SCOPE } from '@/types/skill';
 import type { AgentSkill } from '@/types/skill';
 
 const props = defineProps<{
@@ -154,7 +153,7 @@ watch(() => editingMessage.value?.id, () => {
 });
 
 /**
- * 加载当前用户可用的公共 Skill 和个人 Skill。
+ * 加载当前用户已启用的 Skill。
  */
 async function loadAvailableSkills(): Promise<void> {
   skillsLoading.value = true;
@@ -408,7 +407,7 @@ function formatSize(sizeBytes: number): string {
           <button
             v-for="(skill, index) in matchedSkills"
             v-else
-            :key="`${skill.scope}-${skill.name}`"
+            :key="skill.name"
             class="skill-command-item"
             :class="{ active: index === highlightedSkillIndex }"
             type="button"
@@ -420,7 +419,6 @@ function formatSize(sizeBytes: number): string {
               <strong>/{{ skill.name }}</strong>
               <small>{{ skill.description }}</small>
             </span>
-            <span class="skill-command-scope">{{ skill.scope === SKILL_SCOPE.PUBLIC ? '公共' : '个人' }}</span>
           </button>
           <div v-if="!skillsLoading && !matchedSkills.length" class="skill-command-empty">没有匹配的 Skill</div>
         </div>

@@ -1,7 +1,7 @@
 package com.x.ai.service.impl;
 
 import com.x.ai.common.model.AiModelRuntimeConfig;
-import com.x.ai.common.model.ResourceEnablement;
+import com.x.ai.common.model.McpRuntimeSnapshot;
 import com.x.ai.service.McpRuntimeService;
 import io.agentscope.core.tool.Toolkit;
 import io.agentscope.core.tool.mcp.McpClientWrapper;
@@ -16,7 +16,6 @@ import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CancellationException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,7 +29,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class HarnessAgentMcpCancellationTest {
 
-    private static final ResourceEnablement ALL_ENABLED = new ResourceEnablement(Set.of());
+    private static final McpRuntimeSnapshot MCPS = new McpRuntimeSnapshot(List.of(), "mcps");
 
     @Mock
     private McpRuntimeService mcpRuntimeService;
@@ -54,7 +53,7 @@ class HarnessAgentMcpCancellationTest {
             Thread.currentThread().interrupt();
             throw failure;
         });
-        when(mcpRuntimeService.getVisibleClients("42", ALL_ENABLED)).thenReturn(List.of(first, interrupted, unvisited));
+        when(mcpRuntimeService.getClients(MCPS)).thenReturn(List.of(first, interrupted, unvisited));
 
         assertThatThrownBy(this::registerClients).isSameAs(failure);
 
@@ -71,7 +70,7 @@ class HarnessAgentMcpCancellationTest {
         McpClientWrapper failed = mock(McpClientWrapper.class);
         when(failed.getName()).thenReturn("failed");
         when(failed.initialize()).thenReturn(Mono.error(new IllegalStateException("unavailable")));
-        when(mcpRuntimeService.getVisibleClients("42", ALL_ENABLED)).thenReturn(List.of(first, failed));
+        when(mcpRuntimeService.getClients(MCPS)).thenReturn(List.of(first, failed));
 
         assertThat(registerClients()).containsExactly(first);
 
@@ -82,7 +81,7 @@ class HarnessAgentMcpCancellationTest {
     @Test
     void interruptionAfterClientsAreReturnedClosesThemWithoutStartingRegistration() {
         McpClientWrapper unvisited = mock(McpClientWrapper.class);
-        when(mcpRuntimeService.getVisibleClients("42", ALL_ENABLED)).thenAnswer(invocation -> {
+        when(mcpRuntimeService.getClients(MCPS)).thenAnswer(invocation -> {
             Thread.currentThread().interrupt();
             return List.of(unvisited);
         });
@@ -121,6 +120,6 @@ class HarnessAgentMcpCancellationTest {
      * 聚焦私有注册批次，避免测试无关模型、数据库和 Docker 初始化。
      */
     private List<McpClientWrapper> registerClients() {
-        return ReflectionTestUtils.invokeMethod(service, "registerMcpClients", new Toolkit(), "42", ALL_ENABLED);
+        return ReflectionTestUtils.invokeMethod(service, "registerMcpClients", new Toolkit(), MCPS);
     }
 }

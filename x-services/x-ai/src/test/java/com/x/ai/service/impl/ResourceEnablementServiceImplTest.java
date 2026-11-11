@@ -1,6 +1,5 @@
 package com.x.ai.service.impl;
 
-import com.x.ai.common.enums.SkillScope;
 import com.x.ai.common.model.ResourceEnablement;
 import com.x.ai.db.entity.AgentDisabledResource;
 import com.x.ai.db.service.AgentDisabledResourceIService;
@@ -27,7 +26,7 @@ class ResourceEnablementServiceImplTest {
         AgentDisabledResourceIService resources = mock(AgentDisabledResourceIService.class);
         when(resources.saveOrUpdate(any(AgentDisabledResource.class))).thenReturn(true);
         ResourceEnablementServiceImpl service = new ResourceEnablementServiceImpl(resources);
-        String key = ResourceEnablement.skillKey(SkillScope.PUBLIC, "example");
+        String key = ResourceEnablement.skillKey("example");
 
         service.setEnabled("42", key, false);
         service.setEnabled("43", key, false);
@@ -45,14 +44,12 @@ class ResourceEnablementServiceImplTest {
     }
 
     @Test
-    void snapshotIsImmutableAndKeepsSkillScopesIndependent() {
-        Set<String> disabled = new HashSet<>(Set.of(ResourceEnablement.skillKey(SkillScope.USER, "example")));
+    void snapshotIsImmutableAndKeepsResourceSwitchesIndependent() {
+        Set<String> disabled = new HashSet<>(Set.of(ResourceEnablement.skillKey("example")));
         ResourceEnablement snapshot = new ResourceEnablement(disabled);
         disabled.clear();
 
-        assertFalse(snapshot.isSkillEnabled(SkillScope.USER, "example"));
-        assertTrue(snapshot.isSkillEnabled(SkillScope.PUBLIC, "example"));
-        assertTrue(snapshot.isSkillEnabled(SkillScope.SHARED, "example"));
-        assertTrue(snapshot.isMcpEnabled(7L));
+        assertFalse(snapshot.isSkillEnabled("example"));
+        assertTrue(snapshot.isSkillEnabled("another"));
     }
 }

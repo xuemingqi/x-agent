@@ -6,7 +6,7 @@ root = Path(__file__).resolve().parents[1]
 sources = [
     "x-services/x-contact/src/main/resources/db/user-schema.sql",
     "x-services/x-ai/src/main/resources/db/agent-schema.sql",
-    "x-services/x-ai-mcp-runtime/src/main/resources/db/mcp-schema.sql",
+    "x-services/x-ai/src/main/resources/db/mcp-schema.sql",
     "x-services/x-ai/src/main/resources/db/quartz-schema.sql",
 ]
 target = root / "config/sql/x-agent-init.sql"

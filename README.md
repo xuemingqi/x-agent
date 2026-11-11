@@ -2,7 +2,7 @@
 
 基于 Java 21、Spring Boot 4、Spring Cloud Alibaba 和 AgentScope Java 的独立 AI Agent 平台，采用 [MIT 协议](LICENSE)。
 
-支持多用户登录、个人模型配置、流式对话、会话与文件、Docker 沙箱、公共/个人 Skill、知识库、MCP 管理、定时任务、浏览器截图、多模态和智能应用，并通过 HTTP Open API 与 MCP 对外提供 Agent 能力。
+支持多用户登录、个人模型配置、流式对话、会话与文件、Docker 沙箱、个人 Skill、知识库、MCP 管理、定时任务、浏览器截图、多模态和智能应用，并通过 HTTP Open API 与 MCP 对外提供 Agent 能力。
 
 ## 项目结构
 
@@ -12,20 +12,17 @@ x-apis                   服务间 Feign 契约
   x-auth-api             Token 校验
   x-contact-api          用户身份与账号
   x-ai-api               AI / Open API
-  x-ai-mcp-runtime-api   MCP 管理契约
 x-framework              common / core / web / db / redis / minio
 x-services
   x-auth                 登录、验证码、JWT、退出及失败锁定
   x-contact              用户认证、身份查询、账号创建
   x-gateway              路由、追踪、文档及 Sentinel 规则
-  x-ai                   AgentScope、模型、会话、知识、Skill、任务
-  x-ai-mcp-runtime       内部 MCP 配置、凭证与连接运行时
-  x-ai-mcp-gateway       对外 Streamable HTTP MCP 服务
+  x-ai                   AgentScope、模型、会话、知识、Skill、任务与 MCP
 x-webs/x-ai-web           Vue 3 + TypeScript 工作台
 config/nacos             可直接导入的公开 Nacos 配置
 config/x-agent-nacos.zip  Nacos 控制台原生 ZIP 导入包
 config/sql               空数据库初始化 SQL
-scripts                  配置导入、SQL 与初始管理员工具
+scripts                  配置导入、SQL 与初始账号工具
 ```
 
 根 `pom.xml` 仅增加统一构建入口，继续保留 `x-parent / x-apis / x-framework / x-services` 分层。项目坐标版本为 `0.1.0-SNAPSHOT`，避免与旧项目产物混用。
@@ -76,7 +73,7 @@ python3 scripts/nacos.py import --create-namespace
 python3 scripts/nacos.py verify
 ```
 
-共 12 项：`DEFAULT_GROUP` 下 1 份公共配置、6 份服务配置，`SENTINEL_GROUP` 下 5 份规则。规则初始为空，可按部署需要配置。重复导入默认跳过相同内容；发现不同内容会先停止。确需更新时检查差异后使用 `--overwrite`。
+共 10 项：`DEFAULT_GROUP` 下 1 份公共配置、4 份服务配置，`SENTINEL_GROUP` 下 5 份规则。规则初始为空，可按部署需要配置。重复导入默认跳过相同内容；发现不同内容会先停止。确需更新时检查差异后使用 `--overwrite`。
 
 修改 YAML 后重新生成 ZIP：
 
@@ -97,18 +94,55 @@ mysql -h 127.0.0.1 -u root -p x_agent < config/sql/x-agent-init.sql
 
 SQL 包含用户、AI、MCP、Skill 和 Quartz 表，无私人模型、Key、会话或默认账号。不要把初始化包重复应用到已有数据库；增量升级应单独审核。数据库名称应与 `.env` 中的 `MYSQL_DATABASE` 一致。
 
-生成首个管理员的 INSERT（交互输入密码，不会输出明文密码）：
+生成首个普通用户的 INSERT（交互输入密码，不会输出明文密码）：
 
 ```bash
 umask 077
-python3 scripts/create-admin-sql.py --mobile YOUR_LOGIN_ID --name Administrator > /tmp/x-agent-admin.sql
-mysql -h 127.0.0.1 -u root -p x_agent < /tmp/x-agent-admin.sql
-rm /tmp/x-agent-admin.sql
+python3 scripts/create-user-sql.py --mobile YOUR_LOGIN_ID --name User > /tmp/x-agent-user.sql
+mysql -h 127.0.0.1 -u root -p x_agent < /tmp/x-agent-user.sql
+rm /tmp/x-agent-user.sql
 ```
 
-`--mobile` 是登录标识，与登录页面填写的值一致。默认初始 ID 为 1；重复执行不会覆盖已有账号。后续可通过 `/contact/user/create` 创建普通用户；管理员由数据库 `is_admin` 字段管理。
+`--mobile` 是登录标识，与登录页面填写的值一致。默认初始 ID 为 1；重复执行不会覆盖已有账号。后续可通过 `/contact/user/create` 创建用户。平台只有普通用户一种身份，每人仅维护自己的模型、Skill、知识库和 MCP。
 
-可选的演示 Skill 种子位于 `x-services/x-ai/src/main/resources/db/skill-seed.sql`。改动实体结构后，可运行 `python3 scripts/build-init-sql.py` 重新汇总初始化包。
+改动实体结构后，可运行 `python3 scripts/build-init-sql.py` 重新汇总初始化包。
+
+### MCP 合并与已有数据库升级
+
+MCP 配置、远程连接及对外 Agent 工具统一由 `x-ai` 提供，仅支持 Streamable HTTP。
+AI 实例直接连接远程 MCP 服务；对外 `/mcp` 使用无状态 HTTP 传输，可由 Gateway 分发到多个 AI 实例。
+无需部署独立 MCP Runtime 或 MCP Gateway，也无需管理本地子进程和运行时代理。
+
+升级已有环境时，先停止两个旧 MCP 服务和旧版 AI 进程，备份数据库，再执行 `config/sql/20261111-mcp-http-only.sql`。
+该脚本保留 HTTP MCP 配置，删除旧 STDIO 配置、仅供这些配置使用的凭据及命令、参数和环境变量列；
+旧 STDIO 配置不迁移，需改为可远程访问的 Streamable HTTP 服务后重新添加。
+移除两个旧 MCP 服务，更新 Nacos 中的 `x-gateway.yaml`，删除旧服务的 Nacos 配置。
+再按下面的用户私有资源升级步骤完成数据库迁移，最后统一部署新版服务与前端。
+
+### 用户私有资源升级
+
+本版本移除管理员、公共 Skill、公共 MCP、公共文档和公共在线知识库；接口不再接受资源作用域。
+MCP 的 Header/Query 凭据直接保存在用户自己的配置中，启用状态也由该配置统一管理。
+Skill 只提供个人创建、编辑、导入、导出和启用管理，不再提供分享、接收邀请或跨用户快照。
+旧版已接收的 Skill 在升级时保留为个人内容，同名个人 Skill 不会被覆盖。
+Agent 缓存按用户的模型、Skill 和 MCP 摘要刷新，无需查询管理员身份或维护全局公共资源版本。
+
+已有环境先备份 MySQL 与 PostgreSQL，停止所有旧 AI 和 Contact 实例，然后依次执行：
+
+1. 尚未完成 MCP HTTP 改造的环境，执行 `config/sql/20261111-mcp-http-only.sql`。
+2. 在 MySQL 执行 `config/sql/20261111-user-owned-resources.sql`，删除公共资源与凭据及管理员字段，
+   将已接受的分享快照迁移为个人副本，并迁移 Skill/MCP 启用偏好。
+3. 在 MySQL 执行 `config/sql/20261111-remove-skill-sharing.sql`，删除旧分享关系、快照和快照附件表。
+4. 在 PostgreSQL 知识库执行 `config/sql/20261111-user-owned-knowledge-postgresql.sql`，清理公共文档与切片。
+5. 更新 Nacos 配置（移除 `agent.skill` 公共仓库配置），同时部署新版 Contact、AI 和前端。
+
+已经完成用户私有资源升级的环境，只需停止旧 AI 和 Contact 实例、备份数据库并执行第 3 步，再更新 Contact、AI 和前端。
+其余迁移脚本只执行一次。MySQL DDL 会自动提交，执行失败后应恢复备份并排查，不要直接重复执行。
+新环境直接使用初始化 SQL，无需运行增量脚本。旧公共资源不会自动分配给用户。
+
+测试环境若不需要迁移旧数据，可用 `config/sql/20261111-clean-obsolete-resources.sql` 替代上面的第 1–3 步，
+直接删除公共资源、分享历史、旧凭据及废弃字段，保留个人资源和无关表；随后执行 PostgreSQL 的第 4 步。
+该脚本适用于尚有 `scope`、`is_admin` 和旧 MCP 字段的数据库，不能在清理后的结构上重复执行。
 
 ### RAG 知识库
 
@@ -132,8 +166,7 @@ PGPASSWORD="$KNOWLEDGE_VECTOR_PASSWORD" psql -h YOUR_DATABASE_HOST -p 5432 -U YO
 语义检索及失败重试。原文默认上限 100 MB、正文上限 200 万 UTF-16 字符，切片默认 800 个
 Unicode 字符、重叠 120 个字符，可在 `knowledge` 配置中调整。
 
-`knowledge_search` 工具只检索当前用户个人文档和公共文档，返回文档来源、切片序号及相似度。
-页面试检索仅查询当前选中的作用域。公共文档管理仍要求管理员身份。
+`knowledge_search` 工具和页面试检索只查询当前用户的文档，返回文档来源、切片序号及相似度。
 覆盖、删除和重索引会同步使旧切片失效，索引版本校验阻止过期任务回写。
 应用在索引过程中停止时，可在页面重新索引恢复。
 
@@ -164,12 +197,12 @@ mvn verify
 bash docker/sandbox/build-sandbox-image.sh
 ```
 
-在 IDEA 中分别创建六个服务的 Spring Boot 或 Application 运行配置：
+在 IDEA 中分别创建四个服务的 Spring Boot 或 Application 运行配置：
 
 1. 打开 **Run → Edit Configurations**，选择服务运行配置。
 2. 在 **Environment variables** 字段填写项目根目录 `.env` 的绝对路径，或点击该字段的 **Browse for .env files and scripts** 按钮选择文件。
 3. 将 **Working directory** 设置为项目根目录，JDK 选择 21。
-4. 六个运行配置均选择同一份 `.env`，然后直接在 IDEA 中运行或调试。
+4. 四个运行配置均选择同一份 `.env`，然后直接在 IDEA 中运行或调试。
 
 IDEA 会在每次启动时加载文件中的变量。具体字段位置见 [JetBrains 环境变量文档](https://www.jetbrains.com/help/idea/program-arguments-and-environment-variables.html)。如需限制单个服务内存，可在该运行配置的 **VM options** 填写 `-Xms64m -Xmx384m -XX:ActiveProcessorCount=2`。
 
@@ -182,13 +215,11 @@ X_AGENT_GATEWAY_PORT=28081
 X_AGENT_AUTH_PORT=28082
 X_AGENT_CONTACT_PORT=28084
 X_AGENT_AI_PORT=28086
-X_AGENT_MCP_RUNTIME_PORT=28087
-X_AGENT_MCP_GATEWAY_PORT=28088
 AGENT_HTTP_API_URL=http://127.0.0.1:28081/ai/open/chat/run
 AGENT_MCP_SERVER_URL=http://127.0.0.1:28081/mcp
 ```
 
-前端的 `x-webs/x-ai-web/.env.local` 同步设置 `VITE_GATEWAY_URL=http://127.0.0.1:28081`。修改端口后重启对应服务；不要在这份公共环境文件中设置 `SERVER_PORT`，否则六个服务会争用同一个端口。
+前端的 `x-webs/x-ai-web/.env.local` 同步设置 `VITE_GATEWAY_URL=http://127.0.0.1:28081`。修改端口后重启对应服务；不要在这份公共环境文件中设置 `SERVER_PORT`，否则四个服务会争用同一个端口。
 
 手动启动或部署时，在加载同一份环境变量后，分别运行各模块的 `target/<模块名>-0.1.0-SNAPSHOT.jar`。例如：
 
@@ -196,18 +227,16 @@ AGENT_MCP_SERVER_URL=http://127.0.0.1:28081/mcp
 java -jar x-services/x-contact/target/x-contact-0.1.0-SNAPSHOT.jar
 ```
 
-建议依次启动 Contact、Auth、MCP Runtime、AI、MCP Gateway、Gateway。
+建议依次启动 Contact、Auth、AI、Gateway。
 
 | 服务 | 默认端口 | 路径 |
 | --- | --- | --- |
 | x-gateway | 18081 | 工作台与外部统一入口 |
 | x-auth | 18082 | `/auth` |
 | x-contact | 18084 | `/contact` |
-| x-ai | 18086 | `/ai` |
-| x-ai-mcp-runtime | 18087 | `/mcp`，内部使用 |
-| x-ai-mcp-gateway | 18088 | `/mcp` |
+| x-ai | 18086 | `/ai`，含 `/ai/mcp` |
 
-Gateway 将 `/mcp` 转发到 **x-ai-mcp-gateway**；MCP Runtime 通过 Nacos 被 AI 服务发现，不由公网网关暴露。AI 和 MCP 路由支持长请求和 SSE。部署时 Nacos 注册 IP、Runtime 端口应在调用方网络中可达；多实例应分配不同 `ID_WORKER_ID`。
+Gateway 将外部 `/mcp` 重写为 AI 服务的 `/ai/mcp`；AI 和 MCP 路由支持长请求和 SSE。部署时 Nacos 注册 IP、AI 端口应在 Gateway 网络中可达，AI 实例应能访问所配置的远程 MCP 地址；多实例应分配不同 `ID_WORKER_ID`。
 
 知识库访问由 AI 服务连接 PostgreSQL 与 Ollama 完成，不再要求 Docker daemon 挂载知识目录。
 

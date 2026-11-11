@@ -31,20 +31,6 @@ public class UserServiceImpl implements UserService {
     private final Snowflake snowflake;
 
     @Override
-    public BaseResult<UserDo> getUserById(Long id) {
-        User user = userIService.getById(id);
-        if (user == null) {
-            throw new XException(ResponseCodeEnum.USER_NOT_EXIST);
-        }
-        UserDo result = new UserDo();
-        BeanUtils.copyProperties(user, result);
-        if (user.getSex() != null) {
-            result.setSex(com.x.api.contact.enums.Sex.valueOf(user.getSex().name()));
-        }
-        return ResultUtil.buildResultSuccess(result);
-    }
-
-    @Override
     public BaseResult<UserDo> getOneUser(String mobile) {
         User user = userIService.lambdaQuery()
                 .eq(User::getMobile, mobile)
@@ -94,7 +80,7 @@ public class UserServiceImpl implements UserService {
         //密码sha256加密
         String salt = IdUtil.simpleUUID();
         String encryptPwd = EncryptionUtil.hmacSha256(param.getPassword(), salt);
-        user.setId(snowflake.nextId()).setSalt(salt).setPassword(encryptPwd).setIsAdmin(false);
+        user.setId(snowflake.nextId()).setSalt(salt).setPassword(encryptPwd);
 
         boolean result = userIService.save(user);
         if (result) {

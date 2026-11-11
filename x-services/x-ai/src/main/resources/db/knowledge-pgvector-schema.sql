@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS knowledge_document (
     update_time timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (owner_id, path)
 );
-COMMENT ON TABLE knowledge_document IS 'RAG 文档、原文与索引状态；owner_id 隔离个人和公共文档';
+COMMENT ON TABLE knowledge_document IS 'RAG 文档、原文与索引状态；owner_id 隔离用户文档';
 COMMENT ON COLUMN knowledge_document.generation IS '发布切片时校验的索引版本，阻止过期任务覆盖新上传或删除';
 COMMENT ON COLUMN knowledge_document.source IS '原始文件内容，下载不再依赖共享磁盘';
 

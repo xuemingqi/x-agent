@@ -76,8 +76,4 @@ public interface AgentConstant {
             + StrPool.SLASH + "%s" + StrPool.SLASH
             + CONVERSATION_FILE_OUTPUT_DIRECTORY + StrPool.SLASH;
 
-    /**
-     * 共享 Skill 的发送人手机号元数据键。
-     */
-    String SHARED_SKILL_SENDER_MOBILE_METADATA = "sharedByMobile";
 }

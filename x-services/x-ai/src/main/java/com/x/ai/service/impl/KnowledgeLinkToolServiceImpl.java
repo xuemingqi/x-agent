@@ -24,6 +24,6 @@ public class KnowledgeLinkToolServiceImpl implements KnowledgeLinkToolService {
 
     @Override
     public KnowledgeLinkDetailDo get(ToolContext toolContext, Long id) {
-        return knowledgeLinkManagementService.getVisible(toolContext.getUserId(), id);
+        return knowledgeLinkManagementService.get(toolContext.getUserId(), id);
     }
 }

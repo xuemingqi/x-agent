@@ -21,7 +21,7 @@ public class KnowledgeLinkTools {
 
     @Tool(name = "knowledge_link_catalog", readOnly = true, description = """
             获取当前用户可见的在线知识库链接目录。
-            返回公共在线知识库和当前用户个人在线知识库的文档 ID、名称与简短介绍，不返回实际链接，也不读取文档正文。
+            返回当前用户在线知识库的文档 ID、名称与简短介绍，不返回实际链接，也不读取文档正文。
             仅当用户问题可能需要在线知识库信息时调用本工具。根据文档名称和简短介绍选择相关文档后，
             再调用 knowledge_link_get 获取实际链接。
             本工具不是关键词检索或 RAG，不要把返回的简短介绍当作文档正文。

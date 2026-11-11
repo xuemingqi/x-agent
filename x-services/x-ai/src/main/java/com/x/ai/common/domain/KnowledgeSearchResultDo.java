@@ -41,10 +41,4 @@ public class KnowledgeSearchResultDo {
      */
     @Schema(name = "score", description = "余弦相似度，值越大越相关", minimum = "-1", maximum = "1")
     private double score;
-
-    /**
-     * 来源范围，user 或 public。
-     */
-    @Schema(name = "scope", description = "来源知识库范围", allowableValues = {"user", "public"})
-    private String scope;
 }

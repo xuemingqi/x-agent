@@ -71,10 +71,6 @@ agent:
     max-consecutive-approvals: 8
   streaming:
     blocking-timeout: 10m
-  skill:
-    database-name: "${MYSQL_DATABASE:x_agent}"
-    table-name: agent_public_skill
-    resource-table-name: agent_public_skill_resource
   schedule:
     default-zone-id: Asia/Shanghai
     execution-locale: zh-CN

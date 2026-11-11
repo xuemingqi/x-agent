@@ -17,5 +17,4 @@ logs/
 *.log
 *.pid
 .agentscope/
-.x-ai-mcp/
 output/

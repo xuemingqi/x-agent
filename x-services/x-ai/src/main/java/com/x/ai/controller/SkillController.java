@@ -1,18 +1,14 @@
 package com.x.ai.controller;
 
 import com.x.ai.common.domain.SkillDo;
-import com.x.ai.common.domain.SkillShareDo;
 import com.x.ai.common.dto.ResourceEnabledUpdateDto;
-import com.x.ai.common.dto.SkillShareCreateDto;
 import com.x.ai.common.dto.UserSkillCreateDto;
 import com.x.ai.common.dto.UserSkillUpdateDto;
 import com.x.ai.common.enums.SkillArchiveFormat;
-import com.x.ai.common.enums.SkillScope;
 import com.x.framework.common.constants.CommonConstant;
 import com.x.framework.common.response.BaseResult;
 import com.x.framework.common.response.ResultUtil;
 import com.x.ai.service.SkillService;
-import com.x.ai.service.SkillShareService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
@@ -47,14 +43,11 @@ public class SkillController {
 
     private final SkillService skillService;
 
-    private final SkillShareService skillShareService;
-
-
     @Operation(summary = "修改当前用户的扩展启用状态")
-    @PutMapping("/{scope}/{name}/enabled")
-    public BaseResult<Boolean> setEnabled(@PathVariable int scope, @PathVariable String name,
+    @PutMapping("/{name}/enabled")
+    public BaseResult<Boolean> setEnabled(@PathVariable String name,
                                           @RequestBody @Valid ResourceEnabledUpdateDto request) {
-        return ResultUtil.buildResultSuccess(skillService.setEnabled(SkillScope.fromCode(scope), name, request.getEnabled()));
+        return ResultUtil.buildResultSuccess(skillService.setEnabled(name, request.getEnabled()));
     }
 
     @Operation(summary = "查询当前用户可见的 Skill")
@@ -62,17 +55,17 @@ public class SkillController {
             @Parameter(name = CommonConstant.TOKEN, description = "token", in = ParameterIn.HEADER, required = true)
     })
     @GetMapping
-    public BaseResult<List<SkillDo>> list(@RequestParam(required = false) Integer scope) {
-        return ResultUtil.buildResultSuccess(skillService.list(scope == null ? null : SkillScope.fromCode(scope)));
+    public BaseResult<List<SkillDo>> list() {
+        return ResultUtil.buildResultSuccess(skillService.list());
     }
 
     @Operation(summary = "查询 Skill 详情")
     @Parameters({
             @Parameter(name = CommonConstant.TOKEN, description = "token", in = ParameterIn.HEADER, required = true)
     })
-    @GetMapping("/{scope}/{name}")
-    public BaseResult<SkillDo> get(@PathVariable int scope, @PathVariable String name) {
-        return ResultUtil.buildResultSuccess(skillService.get(SkillScope.fromCode(scope), name));
+    @GetMapping("/{name}")
+    public BaseResult<SkillDo> get(@PathVariable String name) {
+        return ResultUtil.buildResultSuccess(skillService.get(name));
     }
 
     @Operation(summary = "创建当前用户 Skill")
@@ -91,11 +84,11 @@ public class SkillController {
     }
 
     @Operation(summary = "原样导出当前用户可见的 Skill 压缩包")
-    @GetMapping("/{scope}/{name}/export")
-    public ResponseEntity<byte[]> exportArchive(@PathVariable int scope, @PathVariable String name,
+    @GetMapping("/{name}/export")
+    public ResponseEntity<byte[]> exportArchive(@PathVariable String name,
                                                @RequestParam(defaultValue = "zip") String format) {
         SkillArchiveFormat archiveFormat = SkillArchiveFormat.fromExtension(format);
-        byte[] archive = skillService.exportArchive(SkillScope.fromCode(scope), name, archiveFormat);
+        byte[] archive = skillService.exportArchive(name, archiveFormat);
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(archiveFormat.getContentType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(name + "." + archiveFormat.getExtension(), StandardCharsets.UTF_8).build().toString())
                 .contentLength(archive.length).body(archive);
@@ -117,41 +110,5 @@ public class SkillController {
     @DeleteMapping("/{name}")
     public BaseResult<Boolean> delete(@PathVariable String name) {
         return ResultUtil.buildResultSuccess(skillService.delete(name));
-    }
-
-    @Operation(summary = "将当前用户的个人 Skill 分享给指定邮箱用户")
-    @Parameters({
-            @Parameter(name = CommonConstant.TOKEN, description = "token", in = ParameterIn.HEADER, required = true)
-    })
-    @PostMapping("/{name}/shares")
-    public BaseResult<SkillShareDo> share(@PathVariable String name, @RequestBody @Valid SkillShareCreateDto request) {
-        return ResultUtil.buildResultSuccess(skillShareService.share(name, request));
-    }
-
-    @Operation(summary = "查询当前用户待处理的 Skill 分享邀请")
-    @Parameters({
-            @Parameter(name = CommonConstant.TOKEN, description = "token", in = ParameterIn.HEADER, required = true)
-    })
-    @GetMapping("/shares/incoming")
-    public BaseResult<List<SkillShareDo>> listPendingShares() {
-        return ResultUtil.buildResultSuccess(skillShareService.listPending());
-    }
-
-    @Operation(summary = "接受 Skill 分享邀请")
-    @Parameters({
-            @Parameter(name = CommonConstant.TOKEN, description = "token", in = ParameterIn.HEADER, required = true)
-    })
-    @PostMapping("/shares/{shareId}/accept")
-    public BaseResult<Boolean> acceptShare(@PathVariable Long shareId) {
-        return ResultUtil.buildResultSuccess(skillShareService.accept(shareId));
-    }
-
-    @Operation(summary = "拒绝 Skill 分享邀请")
-    @Parameters({
-            @Parameter(name = CommonConstant.TOKEN, description = "token", in = ParameterIn.HEADER, required = true)
-    })
-    @PostMapping("/shares/{shareId}/reject")
-    public BaseResult<Boolean> rejectShare(@PathVariable Long shareId) {
-        return ResultUtil.buildResultSuccess(skillShareService.reject(shareId));
     }
 }

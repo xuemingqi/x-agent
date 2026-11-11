@@ -1,26 +1,22 @@
 package com.x.ai.service.impl;
 
-import com.x.ai.common.model.ResourceEnablement;
-import com.x.ai.mcp.api.McpRuntimeApi;
-import com.x.ai.mcp.api.domain.McpRuntimeServerDo;
-import com.x.ai.mcp.api.enums.McpScope;
 import com.x.ai.service.HarnessAgentService;
+import com.x.ai.service.McpClientService;
 import com.x.ai.service.McpConnectionService;
-import com.x.ai.service.ResourceEnablementService;
+import com.x.ai.service.McpServerManagementService;
 import com.x.framework.common.dto.UserInfo;
 import com.x.framework.common.enums.ResponseCodeEnum;
 import com.x.framework.common.exception.XException;
 import com.x.framework.common.utils.UserThreadLocalUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.cloud.client.loadbalancer.LoadBalancerClient;
 
 import java.util.List;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -32,29 +28,41 @@ class McpEnablementTest {
     }
 
     @Test
-    void disabledMcpNeverCreatesRuntimeConnection() {
-        McpRuntimeApi runtime = mock(McpRuntimeApi.class);
-        LoadBalancerClient loadBalancer = mock(LoadBalancerClient.class);
-        when(runtime.listRuntimeServers("42")).thenReturn(List.of(new McpRuntimeServerDo().setId(7L).setName("disabled")));
-        McpRuntimeServiceImpl service = new McpRuntimeServiceImpl(runtime, loadBalancer);
+    void emptyOwnedRuntimeListCreatesNoConnections() {
+        McpServerManagementService configuration = mock(McpServerManagementService.class);
+        McpClientService clients = mock(McpClientService.class);
+        when(configuration.listRuntimeServers("42")).thenReturn(List.of());
+        McpRuntimeServiceImpl service = new McpRuntimeServiceImpl(configuration, clients);
 
-        assertTrue(service.getVisibleClients("42", new ResourceEnablement(Set.of(ResourceEnablement.mcpKey(7L)))).isEmpty());
-
-        verifyNoInteractions(loadBalancer);
+        assertTrue(service.getClients(service.load("42")).isEmpty());
+        verifyNoInteractions(clients);
     }
 
     @Test
-    void inaccessibleMcpCannotCreateEnablementPreference() {
-        McpRuntimeApi runtime = mock(McpRuntimeApi.class);
-        ResourceEnablementService enablement = mock(ResourceEnablementService.class);
-        McpServerServiceImpl service = new McpServerServiceImpl(runtime, mock(HarnessAgentService.class),
-                mock(McpConnectionService.class), enablement);
+    void inaccessibleMcpCannotChangeEnablementOrEvictRuntime() {
+        McpServerManagementService configuration = mock(McpServerManagementService.class);
+        HarnessAgentService agents = mock(HarnessAgentService.class);
+        McpServerServiceImpl service = new McpServerServiceImpl(configuration, agents,
+                mock(McpConnectionService.class));
         UserThreadLocalUtil.set(UserInfo.builder().userId("42").build());
-        when(runtime.get("42", McpScope.USER.getCode(), 7L))
+        when(configuration.setEnabled("42", 7L, false))
                 .thenThrow(new XException(ResponseCodeEnum.AGENT_MCP_NOT_FOUND));
 
-        assertThrows(XException.class, () -> service.setEnabled(McpScope.USER, 7L, false));
+        assertThrows(XException.class, () -> service.setEnabled(7L, false));
+        verifyNoInteractions(agents);
+    }
 
-        verifyNoInteractions(enablement);
+    @Test
+    void changingOwnedMcpEnablementEvictsCurrentUsersRuntime() {
+        McpServerManagementService configuration = mock(McpServerManagementService.class);
+        HarnessAgentService agents = mock(HarnessAgentService.class);
+        McpServerServiceImpl service = new McpServerServiceImpl(configuration, agents,
+                mock(McpConnectionService.class));
+        UserThreadLocalUtil.set(UserInfo.builder().userId("42").build());
+
+        service.setEnabled(7L, false);
+
+        verify(configuration).setEnabled("42", 7L, false);
+        verify(agents).evictUserAgents("42");
     }
 }

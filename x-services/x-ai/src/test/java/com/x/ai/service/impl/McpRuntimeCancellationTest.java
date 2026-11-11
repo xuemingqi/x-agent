@@ -1,28 +1,21 @@
 package com.x.ai.service.impl;
 
-import com.x.ai.common.model.ResourceEnablement;
-import com.x.ai.mcp.api.McpRuntimeApi;
-import com.x.ai.mcp.api.domain.McpRuntimeServerDo;
-import io.agentscope.core.tool.mcp.McpClientBuilder;
+import com.x.ai.common.model.McpServer;
+import com.x.ai.common.enums.McpTransportType;
+import com.x.ai.service.McpClientService;
+import com.x.ai.service.McpServerManagementService;
 import io.agentscope.core.tool.mcp.McpClientWrapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
-import org.springframework.cloud.client.DefaultServiceInstance;
-import org.springframework.cloud.client.loadbalancer.LoadBalancerClient;
-import reactor.core.publisher.Mono;
 
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.CancellationException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.RETURNS_SELF;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -31,15 +24,11 @@ import static org.mockito.Mockito.when;
 
 class McpRuntimeCancellationTest {
 
-    private static final ResourceEnablement ALL_ENABLED = new ResourceEnablement(Set.of());
+    private final McpServerManagementService runtimeApi = mock(McpServerManagementService.class);
 
-    private final McpRuntimeApi runtimeApi = mock(McpRuntimeApi.class);
+    private final McpClientService clientService = mock(McpClientService.class);
 
-    private final LoadBalancerClient loadBalancerClient = mock(LoadBalancerClient.class);
-
-    private final McpClientBuilder builder = mock(McpClientBuilder.class, RETURNS_SELF);
-
-    private final McpRuntimeServiceImpl service = new McpRuntimeServiceImpl(runtimeApi, loadBalancerClient);
+    private final McpRuntimeServiceImpl service = new McpRuntimeServiceImpl(runtimeApi, clientService);
 
     @AfterEach
     void clearTestInterrupt() {
@@ -50,11 +39,11 @@ class McpRuntimeCancellationTest {
     void interruptedRequestNeverStartsDiscovery() {
         Thread.currentThread().interrupt();
 
-        assertThatThrownBy(() -> service.getVisibleClients("42", ALL_ENABLED))
+        assertThatThrownBy(() -> service.getClients(service.load("42")))
                 .isInstanceOf(CancellationException.class);
 
         assertThat(Thread.currentThread().isInterrupted()).isTrue();
-        verifyNoInteractions(runtimeApi, loadBalancerClient);
+        verifyNoInteractions(runtimeApi, clientService);
     }
 
     @Test
@@ -66,19 +55,17 @@ class McpRuntimeCancellationTest {
                 runtimeServer(1L), runtimeServer(2L), runtimeServer(3L), runtimeServer(4L)));
         doThrow(new IllegalStateException("close failed")).when(first).close();
 
-        try (MockedStatic<McpClientBuilder> ignored = mockClientBuilder()) {
-            when(builder.buildAsync()).thenReturn(Mono.just(first), Mono.just(second)).thenAnswer(invocation -> {
-                Thread.currentThread().interrupt();
-                throw interruption;
-            });
+        when(clientService.create(any())).thenReturn(first, second).thenAnswer(invocation -> {
+            Thread.currentThread().interrupt();
+            throw interruption;
+        });
 
-            assertThatThrownBy(() -> service.getVisibleClients("42", ALL_ENABLED)).isSameAs(interruption);
+        assertThatThrownBy(() -> service.getClients(service.load("42"))).isSameAs(interruption);
 
-            assertThat(Thread.currentThread().isInterrupted()).isTrue();
-            verify(first).close();
-            verify(second).close();
-            verify(builder, times(3)).buildAsync();
-        }
+        assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        verify(first).close();
+        verify(second).close();
+        verify(clientService, times(3)).create(any());
     }
 
     @Test
@@ -86,18 +73,16 @@ class McpRuntimeCancellationTest {
         McpClientWrapper client = mock(McpClientWrapper.class);
         when(runtimeApi.listRuntimeServers("42")).thenReturn(List.of(runtimeServer(1L)));
 
-        try (MockedStatic<McpClientBuilder> ignored = mockClientBuilder()) {
-            when(builder.buildAsync()).thenAnswer(invocation -> {
-                Thread.currentThread().interrupt();
-                return Mono.just(client);
-            });
+        when(clientService.create(any())).thenAnswer(invocation -> {
+            Thread.currentThread().interrupt();
+            return client;
+        });
 
-            assertThatThrownBy(() -> service.getVisibleClients("42", ALL_ENABLED))
-                    .isInstanceOf(CancellationException.class);
+        assertThatThrownBy(() -> service.getClients(service.load("42")))
+                .isInstanceOf(CancellationException.class);
 
-            assertThat(Thread.currentThread().isInterrupted()).isTrue();
-            verify(client).close();
-        }
+        assertThat(Thread.currentThread().isInterrupted()).isTrue();
+        verify(client).close();
     }
 
     @Test
@@ -105,33 +90,35 @@ class McpRuntimeCancellationTest {
         McpClientWrapper client = mock(McpClientWrapper.class);
         when(runtimeApi.listRuntimeServers("42")).thenReturn(List.of(runtimeServer(1L), runtimeServer(2L)));
 
-        try (MockedStatic<McpClientBuilder> ignored = mockClientBuilder()) {
-            when(builder.buildAsync()).thenReturn(Mono.error(new IllegalStateException("unavailable")), Mono.just(client));
+        when(clientService.create(any())).thenThrow(new IllegalStateException("unavailable")).thenReturn(client);
 
-            assertThat(service.getVisibleClients("42", ALL_ENABLED)).containsExactly(client);
+        assertThat(service.getClients(service.load("42"))).containsExactly(client);
 
-            verify(client, never()).close();
-            verify(builder, times(2)).buildAsync();
-        }
+        verify(client, never()).close();
+        verify(clientService, times(2)).create(any());
     }
 
-    /**
-     * 仅替换客户端网络边界，执行真实发现和批次生命周期。
-     */
-    private MockedStatic<McpClientBuilder> mockClientBuilder() {
-        when(loadBalancerClient.choose(McpRuntimeApi.SERVICE_NAME)).thenReturn(new DefaultServiceInstance(
-                "runtime-1", McpRuntimeApi.SERVICE_NAME, "192.0.2.17", 18087, false));
-        MockedStatic<McpClientBuilder> builders = mockStatic(McpClientBuilder.class);
-        builders.when(() -> McpClientBuilder.create(anyString())).thenReturn(builder);
-        return builders;
+    @Test
+    void creatingClientsDoesNotReadConfigurationAgain() {
+        McpServer configuration = runtimeServer(1L);
+        McpClientWrapper client = mock(McpClientWrapper.class);
+        when(runtimeApi.listRuntimeServers("42")).thenReturn(List.of(configuration));
+        when(clientService.create(configuration)).thenReturn(client);
+        var snapshot = service.load("42");
+
+        assertThat(service.getClients(snapshot)).containsExactly(client);
+
+        verify(runtimeApi, times(1)).listRuntimeServers("42");
+        verify(clientService).create(configuration);
+        verify(client, never()).close();
     }
 
     /**
      * 使用独立名称使每个测试连接都参与当前初始化批次。
      */
-    private McpRuntimeServerDo runtimeServer(Long id) {
-        return new McpRuntimeServerDo().setId(id).setName("server-" + id)
-                .setRuntimePath("/mcp/internal/mcp/42/" + id)
+    private McpServer runtimeServer(Long id) {
+        return new McpServer().setId(id).setName("server-" + id).setTransportType(McpTransportType.STREAMABLE_HTTP)
+                .setEndpoint("https://mcp.example/" + id)
                 .setRequestTimeoutSeconds(30).setInitializationTimeoutSeconds(10);
     }
 }

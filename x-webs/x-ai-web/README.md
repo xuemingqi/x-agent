@@ -25,7 +25,7 @@ npm run dev
 ```
 
 浏览器访问 `http://localhost:5173`。开发环境会把 `/ai` 和 `/auth` 请求代理到
-`http://127.0.0.1:18081`，因此需要同时启动 Gateway、AI、Auth、Contact 和 MCP Runtime 服务。
+`http://127.0.0.1:18081`，因此需要同时启动 Gateway、AI、Auth 和 Contact 服务。
 
 如果 Gateway 地址不同，在本模块 `.env.local` 中设置 `VITE_GATEWAY_URL`。
 
@@ -85,7 +85,7 @@ server {
 }
 ```
 
-`proxy_buffering off` 用于保证 SSE 聊天内容及时到达浏览器，`/mcp` 透传到 Gateway，认证和 MCP session 请求头按 Nginx 默认行为继续传递。
+`proxy_buffering off` 用于保证 SSE 聊天内容及时到达浏览器，`/mcp` 经 Gateway 转发到 AI 服务，认证和 MCP session 请求头按 Nginx 默认行为继续传递。
 
 部署时，在后端环境变量中将 `AGENT_HTTP_API_URL` 和 `AGENT_MCP_SERVER_URL` 设置为用户实际可访问的域名地址，例如 `https://agent.example.com/ai/open/chat/run` 和 `https://agent.example.com/mcp`，供工作台展示外部接入信息。修改 Nginx 配置后执行：
 

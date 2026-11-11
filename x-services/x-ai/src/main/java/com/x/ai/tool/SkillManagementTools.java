@@ -22,7 +22,7 @@ public class SkillManagementTools {
             create/edit 的 content 必须是完整 SKILL.md（含 name、description frontmatter）。
             patch 使用 old_string/new_string 精确替换，file_path 为空时修改 SKILL.md。
             write_file/remove_file 的路径必须位于 references、templates、scripts 或 assets 内。
-            不能访问或修改已禁用的 Skill；公共与共享 Skill 不可通过此工具修改。
+            不能访问或修改已禁用的 Skill。
             """)
     public boolean manage(@ToolParam(name = "action", description = "操作名称") String action,
                           @ToolParam(name = "name", description = "个人 Skill 名称") String name,

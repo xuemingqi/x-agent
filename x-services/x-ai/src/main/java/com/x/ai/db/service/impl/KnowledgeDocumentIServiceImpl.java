@@ -1,6 +1,5 @@
 package com.x.ai.db.service.impl;
 
-import com.x.ai.common.constants.KnowledgeConstant;
 import com.x.ai.common.domain.KnowledgeChunkDo;
 import com.x.ai.common.domain.KnowledgeChunkPageDo;
 import com.x.ai.common.domain.KnowledgeSearchResultDo;
@@ -15,7 +14,6 @@ import org.springframework.stereotype.Service;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -151,32 +149,27 @@ public class KnowledgeDocumentIServiceImpl implements KnowledgeDocumentIService 
     }
 
     @Override
-    public List<KnowledgeSearchResultDo> search(List<String> owners, List<Double> embedding, String model,
+    public List<KnowledgeSearchResultDo> search(String ownerId, List<Double> embedding, String model,
                                                int dimensions, double minimumScore, int limit) {
-        String placeholders = String.join(",", Collections.nCopies(owners.size(), "?"));
         String sql = """
                 WITH candidates AS MATERIALIZED (
-                    SELECT d.path, d.name, c.owner_id, c.chunk_index, c.content, c.embedding
+                    SELECT d.path, d.name, c.chunk_index, c.content, c.embedding
                     FROM knowledge_chunk c JOIN knowledge_document d
                         ON d.owner_id = c.owner_id AND d.path = c.document_path
-                    WHERE c.owner_id IN (%s) AND d.status = 'READY'
+                    WHERE c.owner_id = ? AND d.status = 'READY'
                         AND c.embedding_model = ? AND c.embedding_dimensions = ?
                 )
-                SELECT path, name, owner_id, chunk_index, content,
+                SELECT path, name, chunk_index, content,
                     1 - (embedding <=> CAST(? AS vector)) AS score
                 FROM candidates WHERE 1 - (embedding <=> CAST(? AS vector)) >= ?
                 ORDER BY embedding <=> CAST(? AS vector), path, chunk_index LIMIT ?
-                """.formatted(placeholders);
+                """;
         String vector = vectorLiteral(embedding);
-        List<Object> parameters = new ArrayList<>();
-        parameters.addAll(owners);
-        parameters.addAll(List.of(model, dimensions, vector, vector, minimumScore, vector, limit));
         return database.jdbc().query(sql, (row, index) -> new KnowledgeSearchResultDo()
                         .setPath(row.getString("path")).setName(row.getString("name"))
                         .setChunkIndex(row.getInt("chunk_index")).setContent(row.getString("content"))
-                        .setScore(row.getDouble("score"))
-                        .setScope(KnowledgeConstant.PUBLIC_OWNER.equals(row.getString("owner_id")) ? "public" : "user"),
-                parameters.toArray());
+                        .setScore(row.getDouble("score")),
+                ownerId, model, dimensions, vector, vector, minimumScore, vector, limit);
     }
 
     /**

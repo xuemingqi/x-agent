@@ -14,8 +14,6 @@ public class McpConnectionTestToolDto {
 
     private String id;
 
-    private int scope;
-
     private boolean connected;
 
     private List<String> toolNames = List.of();

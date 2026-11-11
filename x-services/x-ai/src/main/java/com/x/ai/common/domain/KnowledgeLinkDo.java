@@ -1,6 +1,5 @@
 package com.x.ai.common.domain;
 
-import com.x.ai.db.enums.AgentKnowledgeLinkScope;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.experimental.Accessors;
@@ -30,12 +29,6 @@ public class KnowledgeLinkDo {
 
     @Schema(name = "url", description = "在线文档链接")
     private String url;
-
-    @Schema(name = "scope", description = "作用域：1 公共，2 个人")
-    private AgentKnowledgeLinkScope scope;
-
-    @Schema(name = "editable", description = "当前用户是否可以编辑")
-    private boolean editable;
 
     @Schema(name = "createTime", description = "创建时间")
     private LocalDateTime createTime;

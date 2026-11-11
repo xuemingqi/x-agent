@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.x.ai.db.enums.AgentKnowledgeLinkScope;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
@@ -22,7 +21,7 @@ public class AgentKnowledgeLink {
     private Long id;
 
     /**
-     * 所属文件夹 ID，0 表示当前作用域的根目录。
+     * 所属文件夹 ID，0 表示当前用户的根目录。
      */
     @TableField("folder_id")
     private Long folderId;
@@ -52,13 +51,7 @@ public class AgentKnowledgeLink {
     private String urlHash;
 
     /**
-     * 链接作用域。
-     */
-    @TableField("scope")
-    private AgentKnowledgeLinkScope scope;
-
-    /**
-     * 个人链接所属用户 ID，公共链接固定为空字符串。
+     * 链接所属用户 ID。
      */
     @TableField("owner_user_id")
     private String ownerUserId;
@@ -68,12 +61,6 @@ public class AgentKnowledgeLink {
      */
     @TableField("enabled")
     private Boolean enabled;
-
-    /**
-     * 创建用户 ID。
-     */
-    @TableField("created_by")
-    private String createdBy;
 
     /**
      * 创建时间。

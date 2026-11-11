@@ -10,7 +10,7 @@ import java.util.List;
 public interface KnowledgeLinkManagementService {
 
     /**
-     * 查询管理页面使用的个人在线知识库链接，不向页面返回公共文档。
+     * 查询管理页面使用的个人在线知识库链接。
      *
      * @param userId 当前用户 ID
      * @return 可见链接列表
@@ -70,25 +70,6 @@ public interface KnowledgeLinkManagementService {
      * @param id     链接 ID
      * @return 文档 ID、名称和实际链接
      */
-    KnowledgeLinkDetailDo getVisible(String userId, Long id);
+    KnowledgeLinkDetailDo get(String userId, Long id);
 
-    /**
-     * 查询公共在线知识库链接。
-     */
-    List<KnowledgeLinkDo> listPublic();
-
-    /**
-     * 创建公共在线知识库链接。
-     */
-    KnowledgeLinkDo createPublic(String actorUserId, KnowledgeLinkParam param);
-
-    /**
-     * 修改公共在线知识库链接。
-     */
-    KnowledgeLinkDo updatePublic(Long id, KnowledgeLinkParam param);
-
-    /**
-     * 删除公共在线知识库链接。
-     */
-    boolean deletePublic(Long id);
 }

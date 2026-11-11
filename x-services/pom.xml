@@ -21,8 +21,6 @@
         <module>x-contact</module>
         <module>x-gateway</module>
         <module>x-ai</module>
-        <module>x-ai-mcp-runtime</module>
-        <module>x-ai-mcp-gateway</module>
     </modules>
 
     <dependencies>

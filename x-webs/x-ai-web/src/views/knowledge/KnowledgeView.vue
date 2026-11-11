@@ -12,24 +12,17 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 
 import {
   deleteKnowledgeDocument,
-  deletePublicKnowledgeDocument,
   downloadKnowledgeDocument,
-  downloadPublicKnowledgeDocument,
   listKnowledgeDocuments,
-  listPublicKnowledgeDocuments,
   reindexKnowledgeDocument,
   searchKnowledgeDocuments,
   uploadKnowledgeDocuments,
-  uploadPublicKnowledgeDocuments,
 } from '@/api/knowledge';
 import KnowledgeDocumentReader from '@/components/knowledge/KnowledgeDocumentReader.vue';
 import KnowledgeLinkPanel from '@/components/knowledge/KnowledgeLinkPanel.vue';
-import { useAdministrationStore } from '@/stores/administration';
-import type { KnowledgeDocument, KnowledgeIndexStatus, KnowledgeScope, KnowledgeSearchResult } from '@/types/knowledge';
+import type { KnowledgeDocument, KnowledgeIndexStatus, KnowledgeSearchResult } from '@/types/knowledge';
 
 const activeResource = ref<'file' | 'link'>('file');
-const activeScope = ref<KnowledgeScope>('user');
-const administration = useAdministrationStore();
 const documents = ref<KnowledgeDocument[]>([]);
 const linkCount = ref(0);
 const linkPanel = ref<InstanceType<typeof KnowledgeLinkPanel>>();
@@ -54,12 +47,9 @@ let disposed = false;
 
 async function loadDocuments(): Promise<void> {
   const revision = ++listRevision;
-  const scope = activeScope.value;
   loadingDocuments.value = true;
   try {
-    const result = await (scope === 'public'
-      ? listPublicKnowledgeDocuments()
-      : listKnowledgeDocuments());
+    const result = await listKnowledgeDocuments();
     if (!disposed && revision === listRevision) {
       documents.value = result;
       if (selectedDocument.value) {
@@ -89,16 +79,13 @@ async function uploadFiles(event: Event): Promise<void> {
     ElMessage.warning('支持上传 TXT、Markdown、CSV、JSON、HTML、PDF 和 DOCX 文档');
     return;
   }
-  const scope = activeScope.value;
   uploading.value = true;
   try {
-    const uploaded = await (scope === 'public'
-      ? uploadPublicKnowledgeDocuments(files)
-      : uploadKnowledgeDocuments(files));
+    const uploaded = await uploadKnowledgeDocuments(files);
     const failed = uploaded.filter((document) => document.status === 'FAILED').length;
     if (failed) ElMessage.warning(`已保存 ${uploaded.length} 个文档，${failed} 个索引失败，可重新索引`);
     else ElMessage.success(`已上传并索引 ${uploaded.length} 个文档`);
-    if (!disposed && activeScope.value === scope) {
+    if (!disposed) {
       clearSearch();
       await loadDocuments();
     }
@@ -111,9 +98,7 @@ async function uploadFiles(event: Event): Promise<void> {
 
 async function downloadDocument(document: KnowledgeDocument): Promise<void> {
   try {
-    const blob = await (activeScope.value === 'public'
-      ? downloadPublicKnowledgeDocument(document.path)
-      : downloadKnowledgeDocument(document.path));
+    const blob = await downloadKnowledgeDocument(document.path);
     const link = window.document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = document.name;
@@ -125,18 +110,15 @@ async function downloadDocument(document: KnowledgeDocument): Promise<void> {
 }
 
 async function removeDocument(document: KnowledgeDocument): Promise<void> {
-  const scope = activeScope.value;
   try {
     await ElMessageBox.confirm(`确定删除“${document.name}”吗？`, '删除文档', {
       confirmButtonText: '删除',
       cancelButtonText: '取消',
       type: 'warning',
     });
-    await (scope === 'public'
-      ? deletePublicKnowledgeDocument(document.path)
-      : deleteKnowledgeDocument(document.path));
+    await deleteKnowledgeDocument(document.path);
     ElMessage.success('文档已删除');
-    if (!disposed && activeScope.value === scope) {
+    if (!disposed) {
       clearSearch();
       await loadDocuments();
     }
@@ -172,14 +154,13 @@ function openSearchResult(result: KnowledgeSearchResult): void {
 
 async function reindexDocument(document: KnowledgeDocument): Promise<void> {
   if (reindexingPaths.value.has(document.path)) return;
-  const scope = activeScope.value;
   const pendingPaths = reindexingPaths.value;
   pendingPaths.add(document.path);
   try {
-    const result = await reindexKnowledgeDocument(document.path, scope);
+    const result = await reindexKnowledgeDocument(document.path);
     if (result.status === 'FAILED') ElMessage.error(result.errorMessage || '索引失败，请检查向量化服务后重试');
     else ElMessage.success('文档索引已更新');
-    if (!disposed && activeScope.value === scope) {
+    if (!disposed) {
       clearSearch();
       await loadDocuments();
     }
@@ -203,13 +184,12 @@ async function searchDocuments(): Promise<void> {
   if (!text) { clearSearch(); return; }
   if (searching.value) return;
   const revision = ++searchRevision;
-  const scope = activeScope.value;
   searching.value = true;
   searchError.value = '';
   searchedQuery.value = text;
   searchResults.value = [];
   try {
-    const result = await searchKnowledgeDocuments(text, scope);
+    const result = await searchKnowledgeDocuments(text);
     if (!disposed && revision === searchRevision) searchResults.value = result;
   } catch (error) {
     if (!disposed && revision === searchRevision) {
@@ -238,26 +218,7 @@ function formatTime(value: string): string {
   return value ? new Date(value).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }) : '--';
 }
 
-async function changeScope(scope: KnowledgeScope): Promise<void> {
-  if (scope === activeScope.value) return;
-  activeScope.value = scope;
-  documents.value = [];
-  linkCount.value = 0;
-  selectedDocument.value = null;
-  reindexingPaths.value = new Set();
-  query.value = '';
-  clearSearch();
-  if (!disposed) await loadDocuments();
-}
-
-onMounted(async () => {
-  try {
-    await administration.load();
-  } catch {
-    // 管理员状态不可用时保持普通用户界面，后端仍会拒绝公共写操作。
-  }
-  if (!disposed) await loadDocuments();
-});
+onMounted(loadDocuments);
 
 onUnmounted(() => { disposed = true; });
 </script>
@@ -294,16 +255,12 @@ onUnmounted(() => { disposed = true; });
           <el-icon><Link /></el-icon>在线文档<span>{{ linkCount }}</span>
         </button>
       </nav>
-      <div v-if="administration.isAdministrator" class="scope-switch" aria-label="知识范围">
-        <button :class="{ active: activeScope === 'user' }" :aria-pressed="activeScope === 'user'" @click="changeScope('user')">个人知识库</button>
-        <button :class="{ active: activeScope === 'public' }" :aria-pressed="activeScope === 'public'" @click="changeScope('public')">公共知识库</button>
-      </div>
     </div>
 
     <div v-if="activeResource === 'file'" class="knowledge-workspace" :class="{ 'has-document': selectedDocument }">
       <aside ref="catalogElement" class="knowledge-catalog" aria-label="文档目录与检索">
         <div class="catalog-header">
-          <div><strong>{{ activeScope === 'public' ? '公共文档' : '我的文档' }}</strong><span>{{ documents.length }} 份 · {{ readyCount }} 份已索引</span></div>
+          <div><strong>我的文档</strong><span>{{ documents.length }} 份 · {{ readyCount }} 份已索引</span></div>
           <el-button text :loading="loadingDocuments" title="刷新文档列表" aria-label="刷新文档列表" @click="loadDocuments">
             <el-icon><Refresh /></el-icon>
           </el-button>
@@ -324,7 +281,7 @@ onUnmounted(() => { disposed = true; });
             <p class="searched-query">“{{ searchedQuery }}”</p>
             <p v-if="searchError" class="index-error" role="alert">{{ searchError }}</p>
             <button
-              v-for="(result, index) in searchResults" :key="`${result.scope}-${result.path}-${result.chunkIndex}-${index}`"
+              v-for="(result, index) in searchResults" :key="`${result.path}-${result.chunkIndex}-${index}`"
               type="button" class="search-result"
               :class="{ selected: selectedDocument?.path === result.path && selectedChunkIndex === result.chunkIndex }"
               @click="openSearchResult(result)"
@@ -370,8 +327,8 @@ onUnmounted(() => { disposed = true; });
       </aside>
 
       <KnowledgeDocumentReader
-        v-if="selectedDocument" :key="`${activeScope}-${selectedDocument.path}-${readerRevision}`"
-        :document="selectedDocument" :scope="activeScope" :initial-tab="detailTab" :initial-chunk-index="selectedChunkIndex"
+        v-if="selectedDocument" :key="`${selectedDocument.path}-${readerRevision}`"
+        :document="selectedDocument" :initial-tab="detailTab" :initial-chunk-index="selectedChunkIndex"
         :reindexing="reindexingPaths.has(selectedDocument.path)"
         @close="closeDocument" @download="downloadDocument(selectedDocument)"
         @reindex="reindexDocument(selectedDocument)" @delete="removeDocument(selectedDocument)"
@@ -380,12 +337,12 @@ onUnmounted(() => { disposed = true; });
         <el-icon><Document /></el-icon>
         <h2>从一份文档开始</h2>
         <p>在左侧选择文档，阅读正文、查看切片<br />也可以输入问题，定位相关知识的来源</p>
-        <span>{{ activeScope === 'public' ? '公共知识可用于所有用户的对话' : '个人文档仅当前用户可见' }}</span>
+        <span>文档仅当前用户可见</span>
       </section>
     </div>
 
     <KnowledgeLinkPanel
-      v-show="activeResource === 'link'" ref="linkPanel" :public-mode="activeScope === 'public'"
+      v-show="activeResource === 'link'" ref="linkPanel"
       @count-change="linkCount = $event"
     />
   </section>
@@ -431,9 +388,6 @@ onUnmounted(() => { disposed = true; });
 }
 .knowledge-tabs button.active { border-bottom-color: var(--primary); background: transparent; }
 .knowledge-tabs button > span { margin: 0; padding: 0; background: transparent; font-size: 12px; font-variant-numeric: tabular-nums; }
-.knowledge-controls .scope-switch { width: auto; margin: 0 0 12px; padding: 0; gap: 4px; border: 0; background: transparent; }
-.scope-switch button { min-height: 32px; padding: 4px 12px; border-radius: 8px; font-size: 12px; }
-.scope-switch button.active::after { display: none; }
 .knowledge-workspace {
   display: grid;
   flex: 1;
@@ -505,7 +459,6 @@ button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
   .knowledge-header { flex-direction: column; align-items: flex-start; gap: 16px; margin-bottom: 16px; }
   .knowledge-header > .el-button { width: 100%; }
   .knowledge-controls .knowledge-tabs { gap: 20px; }
-  .knowledge-controls .scope-switch { margin-bottom: 8px; }
   .knowledge-empty-reader { padding: 24px; }
 }
 </style>

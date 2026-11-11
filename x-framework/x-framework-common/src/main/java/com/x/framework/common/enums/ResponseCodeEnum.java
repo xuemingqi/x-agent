@@ -21,7 +21,7 @@ public enum ResponseCodeEnum {
     FILE_NOT_FOUND(HttpStatus.BAD_REQUEST, 404, "不存在"),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, 405, "请求方式错误！"),
     TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, 429, "too many requests"),
-    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, 500, "发生未知错误，请联系管理员！"),
+    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, 500, "发生未知错误，请稍后重试！"),
 
     /**
      * auth模块
@@ -82,8 +82,6 @@ public enum ResponseCodeEnum {
     AGENT_MCP_CONFIG_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, 15064, "MCP 持久化配置不可用！"),
     AGENT_MCP_CONNECTION_ERROR(HttpStatus.BAD_GATEWAY, 15065, "MCP 服务连接失败！"),
     API_KEY_INVALID(HttpStatus.UNAUTHORIZED, 15070, "API Key 无效或已失效！"),
-    ADMIN_PERMISSION_REQUIRED(HttpStatus.FORBIDDEN, 15080, "需要管理员权限！"),
-    ADMIN_AUTHORIZATION_UNAVAILABLE(HttpStatus.BAD_GATEWAY, 15081, "用户权限查询暂时不可用！"),
     AGENT_KNOWLEDGE_LINK_INVALID(HttpStatus.BAD_REQUEST, 15100, "在线知识库链接无效！"),
     AGENT_KNOWLEDGE_LINK_NOT_FOUND(HttpStatus.NOT_FOUND, 15101, "在线知识库链接不存在！"),
     AGENT_KNOWLEDGE_LINK_CONFLICT(HttpStatus.CONFLICT, 15102, "在线知识库链接已存在！"),
@@ -91,11 +89,6 @@ public enum ResponseCodeEnum {
     AGENT_KNOWLEDGE_FOLDER_NOT_FOUND(HttpStatus.NOT_FOUND, 15104, "在线知识库文件夹不存在！"),
     AGENT_KNOWLEDGE_FOLDER_CONFLICT(HttpStatus.CONFLICT, 15105, "当前目录下已存在同名文件夹！"),
     AGENT_KNOWLEDGE_FOLDER_NOT_EMPTY(HttpStatus.CONFLICT, 15106, "文件夹中仍有文档或子文件夹，请先移出或删除！"),
-    AGENT_SKILL_SHARE_RECIPIENT_NOT_FOUND(HttpStatus.NOT_FOUND, 15110, "分享用户不存在！"),
-    AGENT_SKILL_SHARE_CONFLICT(HttpStatus.CONFLICT, 15111, "该 Skill 已分享给此用户！"),
-    AGENT_SKILL_SHARE_NOT_FOUND(HttpStatus.NOT_FOUND, 15112, "Skill 分享邀请不存在！"),
-    AGENT_SKILL_SHARE_STATUS_CONFLICT(HttpStatus.CONFLICT, 15113, "Skill 分享邀请状态已发生变化！"),
-    AGENT_SKILL_SHARE_NAME_CONFLICT(HttpStatus.CONFLICT, 15114, "已接受同名的共享 Skill！"),
     AGENT_SKILL_ARCHIVE_INVALID(HttpStatus.BAD_REQUEST, 15120, "Skill 压缩包无效：请使用 ZIP、TAR 或 TAR.GZ，包含一个 SKILL.md，且文件不超过 20MB、解包不超过 50MB/500 项，不含链接或越界路径！"),
     AGENT_SKILL_IMPORT_MODEL_ERROR(HttpStatus.BAD_GATEWAY, 15121, "默认模型未能完成 Skill 整理，请检查模型配置后重试！"),
     AGENT_CONVERSATION_IMAGE_INVALID(HttpStatus.BAD_REQUEST, 15122, "图片无效或超过大小限制，请使用 PNG、JPEG、GIF 或 WebP 图片！"),

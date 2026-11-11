@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Bean;
 public class ExternalChatApiFeignConfiguration {
 
     /**
-     * 将当前 MCP HTTP 请求中的 API Key 透传给 x-ai。
+     * 将当前请求中的 API Key 透传给外部 Agent API。
      */
     @Bean
     public RequestInterceptor externalChatApiKeyInterceptor() {

@@ -2,7 +2,6 @@ package com.x.ai.service.impl;
 
 import com.x.ai.common.constants.SkillArchiveConstant;
 import com.x.ai.common.enums.SkillManagementAction;
-import com.x.ai.common.enums.SkillScope;
 import com.x.ai.common.model.ResourceEnablement;
 import com.x.ai.common.model.SkillManagementParam;
 import com.x.ai.common.model.ToolContext;
@@ -41,7 +40,7 @@ public class SkillManagementServiceImpl implements SkillManagementService {
     public boolean manage(ToolContext context, SkillManagementParam param) {
         String userId = requireUserId(context);
         if (param == null || StringUtil.isBlank(param.getName())
-                || !resourceEnablementService.get(userId).isSkillEnabled(SkillScope.USER, param.getName())) {
+                || !resourceEnablementService.get(userId).isSkillEnabled(param.getName())) {
             throw new XException(ResponseCodeEnum.AGENT_SKILL_NOT_FOUND);
         }
         SkillManagementAction action = param.getAction();
@@ -76,7 +75,7 @@ public class SkillManagementServiceImpl implements SkillManagementService {
         String userId = requireUserId(context);
         AgentSkill proposed = parseDefinition(null, content, Map.of());
         userSkillService.save(userId, proposed, false);
-        resourceEnablementService.setEnabled(userId, ResourceEnablement.skillKey(SkillScope.USER, proposed.getName()), false);
+        resourceEnablementService.setEnabled(userId, ResourceEnablement.skillKey(proposed.getName()), false);
         return proposed.getName();
     }
 

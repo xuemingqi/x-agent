@@ -10,7 +10,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 /**
- * 个人和公共文档共享的 RAG 流程，调用方负责确定可信所有者与公共管理权限。
+ * 用户文档 RAG 流程，调用方从请求或工具上下文确定可信所有者。
  */
 public interface RagKnowledgeService {
 
@@ -25,7 +25,7 @@ public interface RagKnowledgeService {
     KnowledgeDocumentDo upload(String ownerId, MultipartFile file);
 
     /**
-     * 保存指定相对路径的文档字节，供公共文本写入调用。
+     * 保存指定相对路径的用户文档字节。
      */
     KnowledgeDocumentDo upload(String ownerId, String path, byte[] source);
 
@@ -55,12 +55,8 @@ public interface RagKnowledgeService {
     KnowledgeDocumentDo reindex(String ownerId, String path);
 
     /**
-     * 检索用户个人文档，可选择合并公共文档；每次最多 20 条。
+     * 仅检索指定用户的文档；每次最多 20 条。
      */
-    List<KnowledgeSearchResultDo> search(String userId, String query, int limit, boolean includePublic);
+    List<KnowledgeSearchResultDo> search(String userId, String query, int limit);
 
-    /**
-     * 仅检索公共文档，供公共管理页面使用。
-     */
-    List<KnowledgeSearchResultDo> searchPublic(String query, int limit);
 }

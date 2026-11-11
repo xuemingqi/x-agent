@@ -1,106 +1,59 @@
 <script setup lang="ts">
 import {
   ArrowDown,
-  Bell,
-  Check,
-  Close,
   Connection,
   Delete,
   Document,
   Download,
   EditPen,
-  Lock,
   Loading,
   MagicStick,
   Plus,
-  Share,
   Upload,
-  User,
 } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { computed, onMounted, reactive, ref } from 'vue';
 
 import {
-  acceptSkillShare,
-  createPublicSkill,
   createUserSkill,
-  deletePublicSkill,
   deleteUserSkill,
   exportSkillArchive,
   importSkillArchive,
-  listPendingSkillShares,
   listSkills,
-  listPublicSkills,
-  rejectSkillShare,
-  shareUserSkill,
   setSkillEnabled,
-  updatePublicSkill,
   updateUserSkill,
 } from '@/api/skill';
 import McpManagementPanel from '@/components/extension/McpManagementPanel.vue';
-import { useAdministrationStore } from '@/stores/administration';
 import { useModelSettingStore } from '@/stores/model-setting';
-import { MCP_SCOPE } from '@/types/mcp';
-import type { McpScope } from '@/types/mcp';
-import { SKILL_SCOPE } from '@/types/skill';
-import type { AgentSkill, SkillArchiveFormat, SkillScope, SkillShare, UserSkillPayload } from '@/types/skill';
+import type { AgentSkill, SkillArchiveFormat, UserSkillPayload } from '@/types/skill';
 
 const activeExtension = ref<'skill' | 'mcp'>('skill');
-const administration = useAdministrationStore();
 const modelSetting = useModelSettingStore();
 const archiveInput = ref<HTMLInputElement | null>(null);
 const importing = ref(false);
 const exportingSkillKey = ref('');
 const togglingSkills = reactive(new Set<string>());
-const activeScope = ref<SkillScope>(SKILL_SCOPE.USER);
-const activeMcpScope = ref<McpScope>(MCP_SCOPE.USER);
 const mcpManagementPanel = ref<{ openCreate: () => void } | null>(null);
 const skills = ref<AgentSkill[]>([]);
-const pendingShares = ref<SkillShare[]>([]);
 const loading = ref(false);
-const loadingShares = ref(false);
 const saving = ref(false);
-const sharing = ref(false);
-const respondingShareId = ref('');
 const dialogVisible = ref(false);
-const shareDialogVisible = ref(false);
 const editingName = ref('');
-const sharingSkillName = ref('');
-const recipientMobile = ref('');
-const readOnly = ref(false);
 const form = reactive({ name: '', description: '', content: '' });
 const archiveFormats: { value: SkillArchiveFormat; label: string; description: string }[] = [
-  { value: 'zip', label: 'ZIP', description: '通用压缩包，方便分享' },
+  { value: 'zip', label: 'ZIP', description: '通用压缩包，方便备份' },
   { value: 'tar', label: 'TAR', description: '标准归档，适合命令行使用' },
   { value: 'tar.gz', label: 'TAR.GZ', description: 'Gzip 压缩归档，体积更小' },
 ];
 
-const visibleSkills = computed(() => skills.value.filter((skill) => skill.scope === activeScope.value));
-const pendingShareCount = computed(() => pendingShares.value.length);
-const dialogTitle = computed(() => {
-  if (readOnly.value) return activeScope.value === SKILL_SCOPE.SHARED ? '共享 Skill' : '公共 Skill';
-  return editingName.value ? '修改 Skill' : '创建 Skill';
-});
-const skillDialogScope = computed(() => {
-  if (activeScope.value === SKILL_SCOPE.PUBLIC) return '公共 Skill';
-  if (activeScope.value === SKILL_SCOPE.SHARED) return '共享 Skill';
-  return '个人 Skill';
-});
-const skillDialogDescription = computed(() => {
-  if (readOnly.value) return '查看 Skill 的使用场景与完整指令。';
-  return editingName.value ? '调整 Skill 描述与执行指令。' : '将一套可复用的工作方法交给 Agent。';
-});
+const dialogTitle = computed(() => editingName.value ? '修改 Skill' : '创建 Skill');
+const skillDialogDescription = computed(() => editingName.value
+  ? '调整 Skill 描述与执行指令。' : '将一套可复用的工作方法交给 Agent。');
 
 async function loadSkills(): Promise<void> {
   loading.value = true;
   try {
-    const visible = await listSkills();
-    if (administration.isAdministrator) {
-      const publicSkills = await listPublicSkills();
-      skills.value = [...visible.filter((skill) => skill.scope !== SKILL_SCOPE.PUBLIC), ...publicSkills];
-    } else {
-      skills.value = visible;
-    }
+    skills.value = await listSkills();
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : 'Skill 加载失败');
   } finally {
@@ -109,11 +62,11 @@ async function loadSkills(): Promise<void> {
 }
 
 async function toggleSkill(skill: AgentSkill): Promise<void> {
-  const key = `${skill.scope}-${skill.name}`;
+  const key = skill.name;
   if (togglingSkills.has(key)) return;
   togglingSkills.add(key);
   try {
-    skill.enabled = await setSkillEnabled(skill, !skill.enabled);
+    skill.enabled = await setSkillEnabled(skill.name, !skill.enabled);
     ElMessage.success(`Skill 已${skill.enabled ? '启用' : '停用'}，下一轮对话生效`);
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '启用状态保存失败');
@@ -122,20 +75,8 @@ async function toggleSkill(skill: AgentSkill): Promise<void> {
   }
 }
 
-async function loadPendingShares(): Promise<void> {
-  loadingShares.value = true;
-  try {
-    pendingShares.value = await listPendingSkillShares();
-  } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : 'Skill 分享邀请加载失败');
-  } finally {
-    loadingShares.value = false;
-  }
-}
-
 function openCreate(): void {
   editingName.value = '';
-  readOnly.value = false;
   Object.assign(form, { name: '', description: '', content: '' });
   dialogVisible.value = true;
 }
@@ -167,7 +108,6 @@ async function importArchive(event: Event): Promise<void> {
   importing.value = true;
   try {
     const skill = await importSkillArchive(file);
-    activeScope.value = SKILL_SCOPE.USER;
     ElMessage.success(`已导入 Skill“${skill.name}”`);
     await loadSkills();
   } catch (error) {
@@ -179,9 +119,9 @@ async function importArchive(event: Event): Promise<void> {
 
 async function exportArchive(skill: AgentSkill, format: SkillArchiveFormat): Promise<void> {
   if (exportingSkillKey.value) return;
-  exportingSkillKey.value = `${skill.scope}-${skill.name}`;
+  exportingSkillKey.value = skill.name;
   try {
-    const blob = await exportSkillArchive(skill, format);
+    const blob = await exportSkillArchive(skill.name, format);
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -201,15 +141,8 @@ function openMcpCreate(): void {
   mcpManagementPanel.value?.openCreate();
 }
 
-function openShare(skill: AgentSkill): void {
-  sharingSkillName.value = skill.name;
-  recipientMobile.value = '';
-  shareDialogVisible.value = true;
-}
-
 function openSkill(skill: AgentSkill): void {
-  editingName.value = skill.editable ? skill.name : '';
-  readOnly.value = !skill.editable;
+  editingName.value = skill.name;
   Object.assign(form, {
     name: skill.name,
     description: skill.description,
@@ -231,10 +164,10 @@ async function saveSkill(): Promise<void> {
       content: form.content.trim(),
     };
     if (editingName.value) {
-      await (activeScope.value === SKILL_SCOPE.PUBLIC ? updatePublicSkill : updateUserSkill)(editingName.value, payload);
+      await updateUserSkill(editingName.value, payload);
       ElMessage.success('Skill 已更新');
     } else {
-      await (activeScope.value === SKILL_SCOPE.PUBLIC ? createPublicSkill : createUserSkill)(payload);
+      await createUserSkill(payload);
       ElMessage.success('Skill 已创建');
     }
     dialogVisible.value = false;
@@ -253,7 +186,7 @@ async function removeSkill(skill: AgentSkill): Promise<void> {
       cancelButtonText: '取消',
       type: 'warning',
     });
-    await (skill.scope === SKILL_SCOPE.PUBLIC ? deletePublicSkill : deleteUserSkill)(skill.name);
+    await deleteUserSkill(skill.name);
     ElMessage.success('Skill 已删除');
     await loadSkills();
   } catch (error) {
@@ -263,57 +196,7 @@ async function removeSkill(skill: AgentSkill): Promise<void> {
   }
 }
 
-async function submitShare(): Promise<void> {
-  const mobile = recipientMobile.value.trim();
-  if (!/^1[3-9]\d{9}$/.test(mobile)) {
-    ElMessage.warning('请输入接收人的有效手机号');
-    return;
-  }
-  sharing.value = true;
-  try {
-    await shareUserSkill(sharingSkillName.value, mobile);
-    shareDialogVisible.value = false;
-    ElMessage.success('分享邀请已发送，接收人同意后 Skill 才会生效');
-  } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : 'Skill 分享失败');
-  } finally {
-    sharing.value = false;
-  }
-}
-
-async function respondToShare(share: SkillShare, accept: boolean): Promise<void> {
-  respondingShareId.value = share.id;
-  try {
-    if (accept) {
-      await acceptSkillShare(share.id);
-      ElMessage.success(`已接受 Skill“${share.skillName}”`);
-      await Promise.all([loadSkills(), loadPendingShares()]);
-    } else {
-      await rejectSkillShare(share.id);
-      ElMessage.success(`已拒绝 Skill“${share.skillName}”`);
-      await loadPendingShares();
-    }
-  } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : 'Skill 分享邀请处理失败');
-  } finally {
-    respondingShareId.value = '';
-  }
-}
-
-function skillCardLabel(skill: AgentSkill): string {
-  if (skill.scope === SKILL_SCOPE.USER) return '个人 Skill';
-  if (skill.scope === SKILL_SCOPE.SHARED) return '共享 Skill';
-  return '公共 Skill';
-}
-
-onMounted(async () => {
-  try {
-    await administration.load();
-  } catch {
-    // 管理员状态不可用时保持普通用户界面。
-  }
-  await Promise.all([loadSkills(), loadPendingShares()]);
-});
+onMounted(loadSkills);
 </script>
 
 <template>
@@ -325,9 +208,7 @@ onMounted(async () => {
         <span>为 Agent 配置可复用的工作指令与工具连接</span>
       </div>
       <div
-        v-if="activeExtension === 'skill'
-          && (activeScope === SKILL_SCOPE.USER
-            || (activeScope === SKILL_SCOPE.PUBLIC && administration.isAdministrator))"
+        v-if="activeExtension === 'skill'"
         class="skill-header-actions"
       >
         <input ref="archiveInput" type="file" accept=".zip,.tar,.tar.gz,.tgz" hidden @change="importArchive" />
@@ -348,19 +229,17 @@ onMounted(async () => {
           @click="openCreate"
         >
           <el-icon><Plus /></el-icon>
-          {{ activeScope === SKILL_SCOPE.PUBLIC ? '创建公共 Skill' : '创建 Skill' }}
+          创建 Skill
         </el-button>
       </div>
       <el-button
-        v-else-if="activeExtension === 'mcp'
-          && (activeMcpScope === MCP_SCOPE.USER
-            || (activeMcpScope === MCP_SCOPE.PUBLIC && administration.isAdministrator))"
+        v-else
         class="page-primary-action"
         type="primary"
         @click="openMcpCreate"
       >
         <el-icon><Plus /></el-icon>
-        {{ activeMcpScope === MCP_SCOPE.PUBLIC ? '创建公共 MCP' : '创建 MCP' }}
+        创建 MCP
       </el-button>
     </header>
 
@@ -370,7 +249,6 @@ onMounted(async () => {
           :class="{ active: activeExtension === 'skill' }" @click="activeExtension = 'skill'">
           <el-icon><MagicStick /></el-icon>
           Skill
-          <i v-if="pendingShareCount" class="notification-dot" aria-label="有待处理的 Skill 分享邀请"></i>
         </button>
         <button role="tab" :aria-selected="activeExtension === 'mcp'"
           :class="{ active: activeExtension === 'mcp' }" @click="activeExtension = 'mcp'">
@@ -378,37 +256,9 @@ onMounted(async () => {
           MCP
         </button>
       </div>
-      <div v-if="activeExtension === 'skill'" class="scope-switch" aria-label="Skill 来源">
-        <button :class="{ active: activeScope === SKILL_SCOPE.USER }" @click="activeScope = SKILL_SCOPE.USER">
-          <el-icon><User /></el-icon>
-          我的 Skill
-        </button>
-        <button :class="{ active: activeScope === SKILL_SCOPE.PUBLIC }" @click="activeScope = SKILL_SCOPE.PUBLIC">
-          <el-icon>
-            <EditPen v-if="administration.isAdministrator" />
-            <Lock v-else />
-          </el-icon>
-          公共 Skill
-        </button>
-        <button :class="{ active: activeScope === SKILL_SCOPE.SHARED }" @click="activeScope = SKILL_SCOPE.SHARED">
-          <el-icon><Bell /></el-icon>
-          共享 Skill
-          <i v-if="pendingShareCount" class="notification-dot" aria-label="有待处理的 Skill 分享邀请"></i>
-        </button>
-      </div>
-      <div v-else class="scope-switch" aria-label="MCP 来源">
-        <button :class="{ active: activeMcpScope === MCP_SCOPE.USER }" @click="activeMcpScope = MCP_SCOPE.USER">
-          <el-icon><User /></el-icon>
-          我的 MCP
-        </button>
-        <button :class="{ active: activeMcpScope === MCP_SCOPE.PUBLIC }" @click="activeMcpScope = MCP_SCOPE.PUBLIC">
-          <el-icon><EditPen v-if="administration.isAdministrator" /><Lock v-else /></el-icon>
-          公共 MCP
-        </button>
-      </div>
     </div>
     <div class="capability-summary">
-      <span v-if="activeExtension === 'skill'">{{ visibleSkills.length }} 个 Skill</span>
+      <span v-if="activeExtension === 'skill'">{{ skills.length }} 个 Skill</span>
       <span>开关仅对我生效 · 下一轮对话生效</span>
     </div>
 
@@ -417,72 +267,30 @@ onMounted(async () => {
         <el-icon class="is-loading"><Loading /></el-icon>
         <span>正在使用默认模型整理 Skill<span>完成后将加入“我的 Skill”</span></span>
       </div>
-      <section v-if="activeScope === SKILL_SCOPE.SHARED && pendingShareCount" class="skill-share-inbox">
-        <div class="skill-share-inbox-title">
-          <div>
-            <span>待处理邀请</span>
-            <p>接受后 Skill 才会加入你的 Agent，拒绝后不会加载。</p>
-          </div>
-          <span class="share-count">{{ pendingShareCount }} 项待处理</span>
-        </div>
-        <div v-loading="loadingShares" class="skill-share-list">
-          <article v-for="share in pendingShares" :key="share.id" class="skill-share-card">
-            <div>
-              <span>{{ share.senderDisplayName || share.senderMobile }} 分享</span>
-              <h3>{{ share.skillName }}</h3>
-              <p>{{ share.description }}</p>
-              <small>{{ share.senderMobile }}</small>
-            </div>
-            <div class="skill-share-actions">
-              <el-button
-                type="primary"
-                :loading="respondingShareId === share.id"
-                @click="respondToShare(share, true)"
-              >
-                <el-icon><Check /></el-icon>
-                接受
-              </el-button>
-              <el-button
-                :disabled="Boolean(respondingShareId)"
-                @click="respondToShare(share, false)"
-              >
-                <el-icon><Close /></el-icon>
-                拒绝
-              </el-button>
-            </div>
-          </article>
-        </div>
-      </section>
-
       <div v-loading="loading" class="skill-grid">
-        <article v-for="skill in visibleSkills" :key="`${skill.scope}-${skill.name}`" class="skill-card"
+        <article v-for="skill in skills" :key="skill.name" class="skill-card"
           :class="{ 'extension-disabled': !skill.enabled }">
           <div class="skill-card-head">
             <div class="extension-icon skill"><el-icon><MagicStick /></el-icon></div>
             <div>
-              <span>{{ skillCardLabel(skill) }}</span>
+              <span>Skill</span>
               <h2>{{ skill.name }}</h2>
             </div>
             <div class="extension-enablement" title="仅对我生效，下一轮对话生效">
               <span>{{ skill.enabled ? '已启用' : '已停用' }}</span>
-              <el-switch :model-value="skill.enabled" :loading="togglingSkills.has(`${skill.scope}-${skill.name}`)"
+              <el-switch :model-value="skill.enabled" :loading="togglingSkills.has(skill.name)"
                 :aria-label="`${skill.enabled ? '停用' : '启用'} Skill ${skill.name}（仅对我生效）`"
                 @change="toggleSkill(skill)" />
             </div>
           </div>
           <p>{{ skill.description }}</p>
-          <small v-if="skill.sharedByMobile" class="skill-shared-by">由 {{ skill.sharedByMobile }} 分享</small>
           <div v-if="skill.resourcePaths.length" class="skill-resources">
             <span>{{ skill.resourcePaths.length }} 个附属文件</span>
           </div>
           <div class="skill-actions">
             <el-button text @click="openSkill(skill)">
-              <el-icon v-if="skill.editable"><EditPen /></el-icon>
-              {{ skill.editable ? '编辑' : '查看' }}
-            </el-button>
-            <el-button v-if="skill.scope === SKILL_SCOPE.USER" text @click="openShare(skill)">
-              <el-icon><Share /></el-icon>
-              分享
+              <el-icon><EditPen /></el-icon>
+              编辑
             </el-button>
             <el-dropdown
               trigger="click"
@@ -494,9 +302,9 @@ onMounted(async () => {
               :disabled="Boolean(exportingSkillKey)"
               @command="exportArchive(skill, $event)"
             >
-              <el-button text :loading="exportingSkillKey === `${skill.scope}-${skill.name}`"
+              <el-button text :loading="exportingSkillKey === skill.name"
                 :disabled="Boolean(exportingSkillKey)">
-                <el-icon v-if="exportingSkillKey !== `${skill.scope}-${skill.name}`"><Download /></el-icon>
+                <el-icon v-if="exportingSkillKey !== skill.name"><Download /></el-icon>
                 导出
                 <el-icon class="archive-menu-chevron"><ArrowDown /></el-icon>
               </el-button>
@@ -520,18 +328,16 @@ onMounted(async () => {
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-            <el-button v-if="skill.editable" text class="danger-action" @click="removeSkill(skill)">
+            <el-button text class="danger-action" @click="removeSkill(skill)">
               <el-icon><Delete /></el-icon>
               删除
             </el-button>
           </div>
         </article>
         <el-empty
-          v-if="!loading && !visibleSkills.length"
+          v-if="!loading && !skills.length"
           :image-size="56"
-          :description="activeScope === SKILL_SCOPE.USER
-            ? '还没有个人 Skill，可以在这里创建或直接让 Agent 帮你创建'
-            : activeScope === SKILL_SCOPE.SHARED ? '还没有已接受的共享 Skill' : '暂无公共 Skill'"
+          description="还没有 Skill，可以在这里创建或直接让 Agent 帮你创建"
         >
           <template #image>
             <span class="empty-state-icon" aria-hidden="true"><el-icon><Document /></el-icon></span>
@@ -540,13 +346,7 @@ onMounted(async () => {
       </div>
     </template>
 
-    <McpManagementPanel
-      v-else
-      ref="mcpManagementPanel"
-      v-model:active-scope="activeMcpScope"
-      :administrator="administration.isAdministrator"
-      :show-scope-switch="false"
-    />
+    <McpManagementPanel v-else ref="mcpManagementPanel" />
 
     <el-dialog
       v-model="dialogVisible"
@@ -560,7 +360,7 @@ onMounted(async () => {
         <div class="content-dialog-heading">
           <div class="content-dialog-heading-icon skill"><el-icon><MagicStick /></el-icon></div>
           <div>
-            <span>{{ skillDialogScope }}</span>
+            <span>我的 Skill</span>
             <strong>{{ dialogTitle }}</strong>
             <p>{{ skillDialogDescription }}</p>
           </div>
@@ -579,7 +379,7 @@ onMounted(async () => {
           <el-form-item label="Skill 名称">
             <el-input
               v-model="form.name"
-              :disabled="Boolean(editingName) || readOnly"
+              :disabled="Boolean(editingName)"
               placeholder="例如：weekly-report-writer"
             >
               <template #prefix><el-icon><MagicStick /></el-icon></template>
@@ -589,7 +389,6 @@ onMounted(async () => {
           <el-form-item label="使用场景描述">
             <el-input
               v-model="form.description"
-              :disabled="readOnly"
               type="textarea"
               :rows="2"
               maxlength="500"
@@ -617,7 +416,6 @@ onMounted(async () => {
               </div>
               <el-input
                 v-model="form.content"
-                :disabled="readOnly"
                 type="textarea"
                 :rows="13"
                 resize="none"
@@ -630,43 +428,20 @@ onMounted(async () => {
 
       <template #footer>
         <div class="content-dialog-footer">
-          <span v-if="!readOnly">保存后将在下一轮对话中加载新指令。</span>
+          <span>保存后将在下一轮对话中加载新指令。</span>
           <div>
-            <el-button @click="dialogVisible = false">{{ readOnly ? '关闭' : '取消' }}</el-button>
-            <el-button v-if="!readOnly" type="primary" :loading="saving" @click="saveSkill">
+            <el-button @click="dialogVisible = false">取消</el-button>
+            <el-button type="primary" :loading="saving" @click="saveSkill">
               {{ editingName ? '保存修改' : '创建 Skill' }}
             </el-button>
           </div>
         </div>
       </template>
     </el-dialog>
-
-    <el-dialog v-model="shareDialogVisible" title="分享 Skill" width="min(520px, 92vw)" destroy-on-close>
-      <el-form label-position="top" @submit.prevent>
-        <el-form-item label="Skill">
-          <el-input :model-value="sharingSkillName" disabled />
-        </el-form-item>
-        <el-form-item label="接收人手机号">
-          <el-input
-            v-model="recipientMobile"
-            type="tel"
-            maxlength="255"
-            placeholder="请输入对方登录平台使用的手机号"
-            @keyup.enter="submitShare"
-          />
-          <small class="field-tip">对方需要在 Skill 页面接受邀请，此 Skill 才会进入其 Agent。</small>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="shareDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="sharing" @click="submitShare">发送邀请</el-button>
-      </template>
-    </el-dialog>
   </section>
 </template>
 
 <style scoped>
-
 .capability-toolbar {
   display: flex;
   align-items: center;
@@ -677,29 +452,11 @@ onMounted(async () => {
 }
 
 .capability-toolbar .extension-tabs,
-.capability-toolbar .scope-switch {
-  width: auto;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  gap: 4px;
-}
-
-.capability-toolbar .scope-switch {
-  padding-left: 24px;
-  border-left: 1px solid var(--line);
-}
-
 .capability-toolbar button {
   min-height: 36px;
   padding: 8px 12px;
   border-radius: 8px;
   font-size: 13px;
-}
-
-.capability-toolbar .scope-switch button.active::after {
-  display: none;
 }
 
 .capability-toolbar button:focus-visible {
@@ -763,32 +520,10 @@ onMounted(async () => {
   font-size: 12px;
 }
 
-.skill-share-inbox {
-  width: 100%;
-  padding: 20px;
-  border-color: var(--line);
-  border-radius: 12px;
-  background: var(--surface);
-}
-
-.share-count {
-  color: var(--text-muted);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
 @container workspace (max-width: 760px) {
   .capability-toolbar { gap: 12px; }
-  .capability-toolbar .scope-switch {
-    width: 100%;
-    padding-left: 0;
-    border-left: 0;
-    flex-wrap: wrap;
-  }
   .skill-grid { grid-template-columns: minmax(0, 1fr); }
   .skill-card { padding: 20px; }
-  .skill-share-card { flex-direction: column; align-items: stretch; gap: 16px; }
-  .skill-share-actions { justify-content: flex-end; }
 }
 
 .skill-header-actions {

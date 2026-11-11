@@ -1,13 +1,14 @@
 package com.x.ai.service.impl;
 
 import com.x.ai.common.domain.McpConnectionResultDo;
+import com.x.ai.common.domain.McpServerDo;
+import com.x.ai.common.dto.McpServerToolCreateDto;
 import com.x.ai.common.dto.McpServerToolDto;
+import com.x.ai.common.dto.McpServerToolUpdateDto;
 import com.x.ai.common.model.ToolContext;
-import com.x.ai.mcp.api.McpRuntimeApi;
-import com.x.ai.mcp.api.domain.McpServerDo;
-import com.x.ai.mcp.api.enums.McpScope;
 import com.x.ai.service.HarnessAgentService;
 import com.x.ai.service.McpConnectionService;
+import com.x.ai.service.McpServerManagementService;
 import com.x.framework.common.exception.XException;
 import org.junit.jupiter.api.Test;
 
@@ -23,7 +24,7 @@ import static org.mockito.Mockito.when;
 
 class McpServerToolServiceImplTest {
 
-    private final McpRuntimeApi runtimeApi = mock(McpRuntimeApi.class);
+    private final McpServerManagementService runtimeApi = mock(McpServerManagementService.class);
 
     private final McpConnectionService connectionService = mock(McpConnectionService.class);
 
@@ -33,36 +34,46 @@ class McpServerToolServiceImplTest {
     @Test
     void preservesLargeIdsAndRemovesCredentialValuesFromToolOutput() {
         long id = 9007199254740993L;
-        when(runtimeApi.list("42", null)).thenReturn(List.of(new McpServerDo().setId(id).setScope(McpScope.USER)
+        when(runtimeApi.list("42")).thenReturn(List.of(new McpServerDo().setId(id)
                 .setHeaders(Map.of("Authorization", "private-token"))
-                .setQueryParameters(Map.of("key", "query-secret"))
-                .setEnvironment(Map.of("SECRET", "environment-secret"))));
+                .setQueryParameters(Map.of("key", "query-secret"))));
 
-        McpServerToolDto result = service.list(new ToolContext().setUserId("42"), null).getFirst();
+        McpServerToolDto result = service.list(new ToolContext().setUserId("42")).getFirst();
 
         assertEquals("9007199254740993", result.getId());
         assertEquals(Map.of("Authorization", ""), result.getHeaders());
         assertEquals(Map.of("key", ""), result.getQueryParameters());
-        assertEquals(Map.of("SECRET", ""), result.getEnvironment());
     }
 
     @Test
     void connectionTestUsesTrustedToolIdentity() {
-        when(connectionService.testConnection("42", McpScope.USER, 99L))
-                .thenReturn(new McpConnectionResultDo().setId(99L).setScope(McpScope.USER)
+        when(connectionService.testConnection("42", 99L))
+                .thenReturn(new McpConnectionResultDo().setId(99L)
                         .setConnected(true).setToolNames(List.of("search")));
 
-        var result = service.testConnection(new ToolContext().setUserId("42"), 2, 99L);
+        var result = service.testConnection(new ToolContext().setUserId("42"), 99L);
 
         assertEquals("99", result.getId());
         assertEquals(List.of("search"), result.getToolNames());
-        verify(connectionService).testConnection("42", McpScope.USER, 99L);
+        verify(connectionService).testConnection("42", 99L);
     }
 
     @Test
-    void rejectsMissingIdentityAndUnknownScopeBeforeRemoteAccess() {
-        assertThrows(XException.class, () -> service.list(null, null));
-        assertThrows(XException.class, () -> service.testConnection(new ToolContext().setUserId("42"), 99, 1L));
+    void rejectsMissingIdentityBeforeConfigurationAccess() {
+        assertThrows(XException.class, () -> service.list(null));
+        assertThrows(XException.class, () -> service.testConnection(new ToolContext(), 1L));
+        verifyNoInteractions(runtimeApi, connectionService);
+    }
+
+    @Test
+    void rejectsRemovedTransportForBothCreateAndUpdate() {
+        ToolContext context = new ToolContext().setUserId("42");
+
+        assertThrows(XException.class, () -> service.create(context,
+                new McpServerToolCreateDto().setTransportType(2)));
+        assertThrows(XException.class, () -> service.update(context, 7L,
+                new McpServerToolUpdateDto().setTransportType(2)));
+
         verifyNoInteractions(runtimeApi, connectionService);
     }
 }

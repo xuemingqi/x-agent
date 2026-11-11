@@ -25,9 +25,6 @@ import jakarta.validation.Valid;
         contextId = "x-contact-user-api")
 public interface UserApi {
 
-    @GetMapping("/contact/user/id/{id}/info")
-    BaseResult<UserDo> getUserById(@PathVariable("id") Long id);
-
     @GetMapping("/contact/user/{mobile}/info")
     BaseResult<UserDo> getUserInfo(@PathVariable("mobile") String mobile);
 

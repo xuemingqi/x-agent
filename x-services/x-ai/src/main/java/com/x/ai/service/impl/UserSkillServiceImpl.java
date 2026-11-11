@@ -4,7 +4,6 @@ import cn.hutool.core.lang.Snowflake;
 import com.x.ai.common.constants.AgentConstant;
 import com.x.ai.common.constants.SkillArchiveConstant;
 import com.x.ai.common.dto.UserSkillCreateDto;
-import com.x.ai.common.enums.SkillScope;
 import com.x.ai.common.model.ResourceEnablement;
 import com.x.ai.db.entity.AgentUserSkill;
 import com.x.ai.db.entity.AgentUserSkillResource;
@@ -53,7 +52,7 @@ public class UserSkillServiceImpl implements UserSkillService {
 
     @Override
     public List<AgentSkill> listEnabled(String userId, ResourceEnablement enablement) {
-        String prefix = ResourceEnablement.skillKey(SkillScope.USER, "");
+        String prefix = ResourceEnablement.skillKey("");
         List<String> disabledNames = enablement.getDisabledKeys().stream()
                 .filter(key -> key.startsWith(prefix)).map(key -> key.substring(prefix.length())).toList();
         return loadSkills(agentUserSkillIService.lambdaQuery().eq(AgentUserSkill::getUserId, userId)

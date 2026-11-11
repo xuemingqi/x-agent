@@ -8,7 +8,6 @@ import com.x.ai.common.domain.KnowledgeLinkDetailDo;
 import com.x.ai.common.domain.KnowledgeLinkDo;
 import com.x.ai.common.model.KnowledgeLinkParam;
 import com.x.ai.db.entity.AgentKnowledgeLink;
-import com.x.ai.db.enums.AgentKnowledgeLinkScope;
 import com.x.ai.db.service.AgentKnowledgeLinkIService;
 import com.x.framework.common.enums.ResponseCodeEnum;
 import com.x.framework.common.exception.XException;
@@ -37,17 +36,13 @@ public class KnowledgeLinkManagementServiceImpl implements KnowledgeLinkManageme
 
     private final KnowledgeLinkFolderManagementService knowledgeLinkFolderManagementService;
 
-
     @Override
     public List<KnowledgeLinkDo> list(String userId) {
-        return agentKnowledgeLinkIService.lambdaQuery()
-                .eq(AgentKnowledgeLink::getEnabled, true)
-                .eq(AgentKnowledgeLink::getScope, AgentKnowledgeLinkScope.USER)
-                .eq(AgentKnowledgeLink::getOwnerUserId, userId)
+        return enabledOwnedQuery(userId)
                 .orderByAsc(AgentKnowledgeLink::getName)
                 .list()
                 .stream()
-                .map(link -> toKnowledgeLinkDo(link, userId))
+                .map(this::toKnowledgeLinkDo)
                 .toList();
     }
 
@@ -64,10 +59,8 @@ public class KnowledgeLinkManagementServiceImpl implements KnowledgeLinkManageme
                 .setSummary(normalized.getSummary())
                 .setUrl(normalized.getUrl())
                 .setUrlHash(StringUtil.sha256Hex(normalized.getUrl()))
-                .setScope(AgentKnowledgeLinkScope.USER)
                 .setOwnerUserId(userId)
-                .setEnabled(true)
-                .setCreatedBy(userId);
+                .setEnabled(true);
         try {
             if (!agentKnowledgeLinkIService.save(link)) {
                 throw new XException(ResponseCodeEnum.AGENT_KNOWLEDGE_LINK_INVALID);
@@ -75,7 +68,7 @@ public class KnowledgeLinkManagementServiceImpl implements KnowledgeLinkManageme
         } catch (DuplicateKeyException error) {
             throw new XException(ResponseCodeEnum.AGENT_KNOWLEDGE_LINK_CONFLICT);
         }
-        return toKnowledgeLinkDo(link, userId);
+        return toKnowledgeLinkDo(link);
     }
 
     @Override
@@ -108,7 +101,6 @@ public class KnowledgeLinkManagementServiceImpl implements KnowledgeLinkManageme
         try {
             boolean updated = agentKnowledgeLinkIService.lambdaUpdate()
                     .eq(AgentKnowledgeLink::getId, id)
-                    .eq(AgentKnowledgeLink::getScope, AgentKnowledgeLinkScope.USER)
                     .eq(AgentKnowledgeLink::getOwnerUserId, userId)
                     .set(normalized.getName() != null, AgentKnowledgeLink::getName, normalized.getName())
                     .set(normalized.getSummary() != null, AgentKnowledgeLink::getSummary, normalized.getSummary())
@@ -122,14 +114,13 @@ public class KnowledgeLinkManagementServiceImpl implements KnowledgeLinkManageme
         } catch (DuplicateKeyException error) {
             throw new XException(ResponseCodeEnum.AGENT_KNOWLEDGE_LINK_CONFLICT);
         }
-        return toKnowledgeLinkDo(ownedLink(userId, id), userId);
+        return toKnowledgeLinkDo(ownedLink(userId, id));
     }
 
     @Override
     public boolean delete(String userId, Long id) {
         boolean deleted = agentKnowledgeLinkIService.lambdaUpdate()
                 .eq(AgentKnowledgeLink::getId, id)
-                .eq(AgentKnowledgeLink::getScope, AgentKnowledgeLinkScope.USER)
                 .eq(AgentKnowledgeLink::getOwnerUserId, userId)
                 .remove();
         if (!deleted) {
@@ -140,9 +131,8 @@ public class KnowledgeLinkManagementServiceImpl implements KnowledgeLinkManageme
 
     @Override
     public List<KnowledgeLinkCatalogDo> catalog(String userId) {
-        return visibleQuery(userId)
+        return enabledOwnedQuery(userId)
                 .select(AgentKnowledgeLink::getId, AgentKnowledgeLink::getName, AgentKnowledgeLink::getSummary)
-                .orderByAsc(AgentKnowledgeLink::getScope)
                 .orderByAsc(AgentKnowledgeLink::getName)
                 .list()
                 .stream()
@@ -154,8 +144,8 @@ public class KnowledgeLinkManagementServiceImpl implements KnowledgeLinkManageme
     }
 
     @Override
-    public KnowledgeLinkDetailDo getVisible(String userId, Long id) {
-        AgentKnowledgeLink link = visibleQuery(userId)
+    public KnowledgeLinkDetailDo get(String userId, Long id) {
+        AgentKnowledgeLink link = enabledOwnedQuery(userId)
                 .eq(AgentKnowledgeLink::getId, id)
                 .one();
         if (link == null) {
@@ -167,113 +157,22 @@ public class KnowledgeLinkManagementServiceImpl implements KnowledgeLinkManageme
                 .setUrl(link.getUrl());
     }
 
-    @Override
-    public List<KnowledgeLinkDo> listPublic() {
-        return agentKnowledgeLinkIService.lambdaQuery()
-                .eq(AgentKnowledgeLink::getEnabled, true)
-                .eq(AgentKnowledgeLink::getScope, AgentKnowledgeLinkScope.PUBLIC)
-                .orderByAsc(AgentKnowledgeLink::getName)
-                .list().stream()
-                .map(this::toPublicKnowledgeLinkDo)
-                .toList();
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public KnowledgeLinkDo createPublic(String actorUserId, KnowledgeLinkParam param) {
-        KnowledgeLinkParam normalized = normalize(param);
-        Long folderId = normalized.getFolderId() == null ? KnowledgeLinkConstant.ROOT_FOLDER_ID : normalized.getFolderId();
-        knowledgeLinkFolderManagementService.lockPublic(folderId);
-        AgentKnowledgeLink link = new AgentKnowledgeLink()
-                .setId(snowflake.nextId())
-                .setFolderId(folderId)
-                .setName(normalized.getName())
-                .setSummary(normalized.getSummary())
-                .setUrl(normalized.getUrl())
-                .setUrlHash(StringUtil.sha256Hex(normalized.getUrl()))
-                .setScope(AgentKnowledgeLinkScope.PUBLIC)
-                .setOwnerUserId("")
-                .setEnabled(true)
-                .setCreatedBy(actorUserId);
-        try {
-            if (!agentKnowledgeLinkIService.save(link)) {
-                throw new XException(ResponseCodeEnum.AGENT_KNOWLEDGE_LINK_INVALID);
-            }
-        } catch (DuplicateKeyException error) {
-            throw new XException(ResponseCodeEnum.AGENT_KNOWLEDGE_LINK_CONFLICT);
-        }
-        return toPublicKnowledgeLinkDo(link);
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public KnowledgeLinkDo updatePublic(Long id, KnowledgeLinkParam param) {
-        KnowledgeLinkParam normalized = normalize(param);
-        knowledgeLinkFolderManagementService.lockPublic(normalized.getFolderId());
-        try {
-            boolean updated = agentKnowledgeLinkIService.lambdaUpdate()
-                    .eq(AgentKnowledgeLink::getId, id)
-                    .eq(AgentKnowledgeLink::getScope, AgentKnowledgeLinkScope.PUBLIC)
-                    .set(AgentKnowledgeLink::getName, normalized.getName())
-                    .set(AgentKnowledgeLink::getSummary, normalized.getSummary())
-                    .set(AgentKnowledgeLink::getUrl, normalized.getUrl())
-                    .set(AgentKnowledgeLink::getUrlHash, StringUtil.sha256Hex(normalized.getUrl()))
-                    .set(normalized.getFolderId() != null, AgentKnowledgeLink::getFolderId, normalized.getFolderId())
-                    .update();
-            if (!updated) {
-                throw new XException(ResponseCodeEnum.AGENT_KNOWLEDGE_LINK_NOT_FOUND);
-            }
-        } catch (DuplicateKeyException error) {
-            throw new XException(ResponseCodeEnum.AGENT_KNOWLEDGE_LINK_CONFLICT);
-        }
-        return toPublicKnowledgeLinkDo(publicLink(id));
-    }
-
-    @Override
-    public boolean deletePublic(Long id) {
-        boolean deleted = agentKnowledgeLinkIService.lambdaUpdate()
-                .eq(AgentKnowledgeLink::getId, id)
-                .eq(AgentKnowledgeLink::getScope, AgentKnowledgeLinkScope.PUBLIC)
-                .remove();
-        if (!deleted) {
-            throw new XException(ResponseCodeEnum.AGENT_KNOWLEDGE_LINK_NOT_FOUND);
-        }
-        return true;
-    }
-
     /**
-     * 构建只包含公共链接和指定用户个人链接的启用资源查询。
+     * 构建只包含指定用户链接的启用资源查询。
      */
-    private LambdaQueryChainWrapper<AgentKnowledgeLink> visibleQuery(String userId) {
+    private LambdaQueryChainWrapper<AgentKnowledgeLink> enabledOwnedQuery(String userId) {
         return agentKnowledgeLinkIService.lambdaQuery()
                 .eq(AgentKnowledgeLink::getEnabled, true)
-                .nested(visible -> visible.eq(AgentKnowledgeLink::getScope, AgentKnowledgeLinkScope.PUBLIC)
-                        .or(user -> user.eq(AgentKnowledgeLink::getScope, AgentKnowledgeLinkScope.USER)
-                                .eq(AgentKnowledgeLink::getOwnerUserId, userId)));
+                .eq(AgentKnowledgeLink::getOwnerUserId, userId);
     }
 
     /**
-     * 查询指定用户拥有的个人链接，公共链接始终只读。
+     * 查询指定用户拥有的链接。
      */
     private AgentKnowledgeLink ownedLink(String userId, Long id) {
         AgentKnowledgeLink link = agentKnowledgeLinkIService.lambdaQuery()
                 .eq(AgentKnowledgeLink::getId, id)
-                .eq(AgentKnowledgeLink::getScope, AgentKnowledgeLinkScope.USER)
                 .eq(AgentKnowledgeLink::getOwnerUserId, userId)
-                .one();
-        if (link == null) {
-            throw new XException(ResponseCodeEnum.AGENT_KNOWLEDGE_LINK_NOT_FOUND);
-        }
-        return link;
-    }
-
-    /**
-     * 查询必须存在的公共在线知识库链接。
-     */
-    private AgentKnowledgeLink publicLink(Long id) {
-        AgentKnowledgeLink link = agentKnowledgeLinkIService.lambdaQuery()
-                .eq(AgentKnowledgeLink::getId, id)
-                .eq(AgentKnowledgeLink::getScope, AgentKnowledgeLinkScope.PUBLIC)
                 .one();
         if (link == null) {
             throw new XException(ResponseCodeEnum.AGENT_KNOWLEDGE_LINK_NOT_FOUND);
@@ -332,33 +231,13 @@ public class KnowledgeLinkManagementServiceImpl implements KnowledgeLinkManageme
     /**
      * 将持久化链接转换为管理界面使用的领域对象。
      */
-    private KnowledgeLinkDo toKnowledgeLinkDo(AgentKnowledgeLink link, String userId) {
-        boolean editable = link.getScope() == AgentKnowledgeLinkScope.USER
-                && userId.equals(link.getOwnerUserId());
+    private KnowledgeLinkDo toKnowledgeLinkDo(AgentKnowledgeLink link) {
         return new KnowledgeLinkDo()
                 .setId(link.getId())
                 .setFolderId(link.getFolderId())
                 .setName(link.getName())
                 .setSummary(link.getSummary())
                 .setUrl(link.getUrl())
-                .setScope(link.getScope())
-                .setEditable(editable)
-                .setCreateTime(link.getCreateTime())
-                .setUpdateTime(link.getUpdateTime());
-    }
-
-    /**
-     * 转换公共链接为管理员可编辑结构。
-     */
-    private KnowledgeLinkDo toPublicKnowledgeLinkDo(AgentKnowledgeLink link) {
-        return new KnowledgeLinkDo()
-                .setId(link.getId())
-                .setFolderId(link.getFolderId())
-                .setName(link.getName())
-                .setSummary(link.getSummary())
-                .setUrl(link.getUrl())
-                .setScope(link.getScope())
-                .setEditable(true)
                 .setCreateTime(link.getCreateTime())
                 .setUpdateTime(link.getUpdateTime());
     }

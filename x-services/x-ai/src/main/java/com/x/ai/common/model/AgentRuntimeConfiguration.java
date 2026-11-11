@@ -22,14 +22,9 @@ public class AgentRuntimeConfiguration {
     private AgentModelMultimodalCapability multimodalCapability;
 
     /**
-     * 当前入口是否允许注册管理员工具。
+     * 当前用户 MCP 配置的不可逆摘要，使其他节点上的配置变更也能刷新运行时。
      */
-    private boolean administrator;
-
-    /**
-     * 公共资源配置版本，用于检测公共 Skill 与 MCP 的变更。
-     */
-    private long publicResourceVersion;
+    private String mcpFingerprint;
 
     /**
      * 构建本次运行时所使用的用户扩展启用状态。

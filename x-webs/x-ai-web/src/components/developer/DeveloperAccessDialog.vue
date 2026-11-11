@@ -83,7 +83,7 @@ async function copyText(value: string, message: string): Promise<void> {
       <div class="access-intro">
         <el-icon><Key /></el-icon>
         <div>
-          <strong>HTTP Open API 与 MCP Gateway 共用 API Key</strong>
+          <strong>HTTP Open API 与 MCP 服务共用 API Key</strong>
           <p>平台只保存 Key 的摘要，明文仅在生成后展示一次。</p>
         </div>
         <el-button type="primary" :loading="issuing" @click="generateApiKey">生成或轮换 Key</el-button>

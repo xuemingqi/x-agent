@@ -20,6 +20,5 @@
         <module>x-auth-api</module>
         <module>x-contact-api</module>
         <module>x-ai-api</module>
-        <module>x-ai-mcp-runtime-api</module>
     </modules>
 </project>

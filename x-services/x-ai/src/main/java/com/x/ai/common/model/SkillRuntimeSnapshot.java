@@ -12,7 +12,7 @@ import java.util.List;
 public class SkillRuntimeSnapshot {
 
     /**
-     * 已启用且获得入口授权的仓库，按公共、共享、个人顺序参与同名覆盖。
+     * 当前用户已启用的 Skill 仓库，只提供不可变快照。
      */
     private List<AgentSkillRepository> repositories;
 

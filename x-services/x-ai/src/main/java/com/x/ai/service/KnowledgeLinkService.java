@@ -9,7 +9,7 @@ import java.util.List;
 public interface KnowledgeLinkService {
 
     /**
-     * 查询当前用户的个人在线知识库链接，不向页面返回公共文档。
+     * 查询当前用户的个人在线知识库链接。
      *
      * @return 可见链接列表
      */

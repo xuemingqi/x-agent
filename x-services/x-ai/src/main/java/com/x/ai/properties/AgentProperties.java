@@ -68,12 +68,6 @@ public class AgentProperties {
     private Streaming streaming = new Streaming();
 
     /**
-     * 技能加载配置。
-     */
-    @Valid
-    private Skill skill = new Skill();
-
-    /**
      * 会话文件配置。
      */
     @Valid
@@ -210,27 +204,6 @@ public class AgentProperties {
     }
 
     @Data
-    public static class Skill {
-        /**
-         * 公共 Skill 所在数据库。
-         */
-        @NotBlank
-        private String databaseName = "x_agent";
-
-        /**
-         * 公共 Skill 主表。
-         */
-        @NotBlank
-        private String tableName = "agent_public_skill";
-
-        /**
-         * 公共 Skill 资源表。
-         */
-        @NotBlank
-        private String resourceTableName = "agent_public_skill_resource";
-    }
-
-    @Data
     public static class ConversationFile {
         /**
          * 单个会话文件允许的最大字节数。
@@ -300,7 +273,7 @@ public class AgentProperties {
         private String httpApiUrl = "http://127.0.0.1:18081/ai/open/chat/run";
 
         /**
-         * 对外 MCP Gateway 地址。
+         * 对外 MCP 服务地址。
          */
         @NotBlank
         private String mcpServerUrl = "http://127.0.0.1:18081/mcp";

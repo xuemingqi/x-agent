@@ -32,10 +32,12 @@ spring:
             - Path=/ai/**
             metadata:
               response-timeout: -1
-          - id: x-ai-mcp-gateway
-            uri: lb://x-ai-mcp-gateway
+          - id: x-ai-mcp
+            uri: lb://x-ai
             predicates:
             - Path=/mcp,/mcp/**
+            filters:
+            - RewritePath=/mcp(?<segment>/?.*), /ai/mcp$\{segment}
             metadata:
               response-timeout: -1
     sentinel:

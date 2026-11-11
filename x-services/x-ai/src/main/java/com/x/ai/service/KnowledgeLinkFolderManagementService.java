@@ -7,7 +7,7 @@ import java.util.List;
 public interface KnowledgeLinkFolderManagementService {
 
     /**
-     * 获取指定用户的个人文件夹，返回平铺的父子关系，不向页面返回公共目录。
+     * 获取指定用户的个人文件夹，返回平铺的父子关系。
      *
      * @param userId 当前用户 ID
      * @return 可见文件夹列表
@@ -55,35 +55,11 @@ public interface KnowledgeLinkFolderManagementService {
 
     /**
      * 在调用方事务内验证并锁定个人目标目录，防止创建或移动文档时目录被并发删除。
-     * 根目录无需加锁；不允许传入公共或其他用户的文件夹 ID。
+     * 根目录无需加锁；不允许传入其他用户的文件夹 ID。
      *
      * @param userId 当前用户 ID
      * @param id     目标文件夹 ID，null 或 0 表示无需验证具体目录
      */
     void lockOwned(String userId, Long id);
 
-    /**
-     * 查询公共在线知识库文件夹。
-     */
-    List<KnowledgeLinkFolderDo> listPublic();
-
-    /**
-     * 创建公共在线知识库文件夹。
-     */
-    KnowledgeLinkFolderDo createPublic(String actorUserId, Long parentId, String name);
-
-    /**
-     * 重命名公共在线知识库文件夹。
-     */
-    KnowledgeLinkFolderDo renamePublic(Long id, String name);
-
-    /**
-     * 删除公共在线知识库空文件夹。
-     */
-    boolean deletePublic(Long id);
-
-    /**
-     * 在写事务中验证并锁定公共目标目录。
-     */
-    void lockPublic(Long id);
 }

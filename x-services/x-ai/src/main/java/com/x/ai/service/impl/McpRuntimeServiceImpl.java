@@ -1,26 +1,21 @@
 package com.x.ai.service.impl;
 
-import com.x.ai.common.model.ResourceEnablement;
-import com.x.ai.mcp.api.McpRuntimeApi;
-import com.x.ai.mcp.api.domain.McpRuntimeServerDo;
+import cn.hutool.crypto.digest.DigestUtil;
+import com.x.framework.common.utils.JsonUtil;
+import com.x.ai.common.model.McpServer;
+import com.x.ai.common.model.McpRuntimeSnapshot;
+import com.x.ai.service.McpClientService;
 import com.x.ai.service.McpRuntimeService;
-import com.x.framework.common.enums.ResponseCodeEnum;
-import com.x.framework.common.exception.XException;
-import io.agentscope.core.tool.mcp.McpClientBuilder;
+import com.x.ai.service.McpServerManagementService;
 import io.agentscope.core.tool.mcp.McpClientWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cloud.client.ServiceInstance;
-import org.springframework.cloud.client.loadbalancer.LoadBalancerClient;
-import org.springframework.cloud.client.loadbalancer.LoadBalancerUriTools;
 import org.springframework.stereotype.Service;
 
-import java.net.URI;
-import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.CancellationException;
 
 @Slf4j
@@ -28,30 +23,43 @@ import java.util.concurrent.CancellationException;
 @RequiredArgsConstructor
 public class McpRuntimeServiceImpl implements McpRuntimeService {
 
-    private final McpRuntimeApi mcpRuntimeApi;
+    private final McpServerManagementService mcpServerManagementService;
 
-    private final LoadBalancerClient loadBalancerClient;
+    private final McpClientService mcpClientService;
 
     @Override
-    public List<McpClientWrapper> getVisibleClients(String userId, ResourceEnablement enablement) {
+    public McpRuntimeSnapshot load(String userId) {
+        checkInitializationInterrupted();
+        List<McpServer> servers = mcpServerManagementService.listRuntimeServers(userId);
+        checkInitializationInterrupted();
+        return new McpRuntimeSnapshot(servers, calculateFingerprint(servers));
+    }
+
+    /**
+     * 固定参数键顺序，使同一配置生成稳定摘要；凭证参与摘要但不会被返回。
+     */
+    private String calculateFingerprint(List<McpServer> servers) {
+        var configurations = servers.stream()
+                .map(server -> Map.of("id", server.getId(), "name", server.getName(),
+                        "transport", server.getTransportType().getCode(), "endpoint", server.getEndpoint(),
+                        "headers", new TreeMap<>(server.getHeaders()),
+                        "query", new TreeMap<>(server.getQueryParameters()),
+                        "requestTimeout", server.getRequestTimeoutSeconds(),
+                        "initializationTimeout", server.getInitializationTimeoutSeconds()))
+                .toList();
+        return DigestUtil.sha256Hex(JsonUtil.toJsonStrOrThrow(configurations));
+    }
+
+    @Override
+    public List<McpClientWrapper> getClients(McpRuntimeSnapshot snapshot) {
         checkInitializationInterrupted();
         List<McpClientWrapper> clients = new ArrayList<>();
-        Set<String> clientNames = new HashSet<>();
-        List<McpRuntimeServerDo> servers = mcpRuntimeApi.listRuntimeServers(userId);
         boolean completed = false;
         try {
-            for (McpRuntimeServerDo server : servers) {
+            for (McpServer server : snapshot.getServers()) {
                 checkInitializationInterrupted();
-                if (!enablement.isMcpEnabled(server.getId())) {
-                    continue;
-                }
-                if (clientNames.contains(server.getName())) {
-                    log.warn("Skip duplicated MCP namespace, serverId={}, name={}", server.getId(), server.getName());
-                    continue;
-                }
                 McpClientWrapper client = createClient(server);
                 if (client != null) {
-                    clientNames.add(server.getName());
                     clients.add(client);
                 }
             }
@@ -69,19 +77,9 @@ public class McpRuntimeServiceImpl implements McpRuntimeService {
     /**
      * 创建单个 MCP 客户端，失败时记录不含凭证的上下文并跳过。
      */
-    private McpClientWrapper createClient(McpRuntimeServerDo server) {
+    private McpClientWrapper createClient(McpServer server) {
         try {
-            String endpoint = resolveRuntimeEndpoint(server.getRuntimePath());
-            McpClientWrapper client = McpClientBuilder.create(server.getName())
-                    .streamableHttpTransport(endpoint)
-                    .timeout(proxyRequestTimeout(server))
-                    .initializationTimeout(proxyInitializationTimeout(server))
-                    .buildAsync()
-                    .block();
-            if (client == null) {
-                throw new XException(ResponseCodeEnum.AGENT_MCP_CONNECTION_ERROR);
-            }
-            return client;
+            return mcpClientService.create(server);
         } catch (RuntimeException error) {
             if (Thread.currentThread().isInterrupted()) {
                 throw error;
@@ -112,31 +110,4 @@ public class McpRuntimeServiceImpl implements McpRuntimeService {
         }
     }
 
-    /**
-     * 创建连接时从注册中心选择一次实例，后续 MCP 会话固定使用该地址，不逐请求负载均衡。
-     * 运行路径沿用 Runtime 返回值，由框架重建 URI，避免重复编码用户标识。
-     */
-    private String resolveRuntimeEndpoint(String runtimePath) {
-        ServiceInstance instance = loadBalancerClient.choose(McpRuntimeApi.SERVICE_NAME);
-        if (instance == null) {
-            throw new XException(ResponseCodeEnum.AGENT_MCP_CONNECTION_ERROR);
-        }
-        return LoadBalancerUriTools.reconstructURI(instance, URI.create(runtimePath)).toString();
-    }
-
-    /**
-     * 为代理转发开销保留一秒，避免后端刚好在配置上限完成时前置客户端先超时。
-     */
-    private Duration proxyRequestTimeout(McpRuntimeServerDo server) {
-        return Duration.ofSeconds((long) server.getRequestTimeoutSeconds() + 1L);
-    }
-
-    /**
-     * 首次访问需要先初始化后端并发现工具，因此覆盖初始化和一次工具列表请求。
-     */
-    private Duration proxyInitializationTimeout(McpRuntimeServerDo server) {
-        long seconds = (long) server.getInitializationTimeoutSeconds()
-                + server.getRequestTimeoutSeconds() + 2L;
-        return Duration.ofSeconds(seconds);
-    }
 }

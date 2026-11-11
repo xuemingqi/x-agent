@@ -1,29 +1,20 @@
 <script setup lang="ts">
-import { ArrowDown, Connection, Delete, Document, EditPen, Key, Link, Lock, Setting, User } from '@element-plus/icons-vue';
+import { ArrowDown, Connection, Delete, Document, EditPen, Link, Setting } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 
 import {
-  createPublicMcpServer,
   createUserMcpServer,
-  deletePublicMcpServer,
   deleteUserMcpServer,
   listMcpServers,
-  listPublicMcpServers,
   testMcpConnection,
   setMcpServerEnabled,
-  updateMcpUserCredential,
-  updatePublicMcpServer,
   updateUserMcpServer,
 } from '@/api/mcp';
-import { MCP_SCOPE, MCP_TRANSPORT_TYPE } from '@/types/mcp';
-import { mergeMcpManagementServers } from './mcpManagement';
+import { MCP_TRANSPORT_TYPE } from '@/types/mcp';
 import type {
-  McpScope,
   McpServer,
   McpServerPayload,
-  McpTransportType,
-  PublicMcpServerPayload,
 } from '@/types/mcp';
 
 interface KeyValueRow {
@@ -32,29 +23,16 @@ interface KeyValueRow {
 }
 
 interface McpForm {
-  scope: McpScope;
   name: string;
   description: string;
-  transportType: McpTransportType;
   endpoint: string;
-  command: string;
-  argumentsText: string;
   headers: KeyValueRow[];
   queryParameters: KeyValueRow[];
-  environment: KeyValueRow[];
-  userCredential: string;
   enabled: boolean;
   requestTimeoutSeconds: number;
   initializationTimeoutSeconds: number;
 }
 
-type DialogMode = 'create' | 'edit' | 'view' | 'credential';
-
-const props = withDefaults(defineProps<{
-  administrator?: boolean;
-  showScopeSwitch?: boolean;
-}>(), { administrator: false, showScopeSwitch: true });
-const activeScope = defineModel<McpScope>('activeScope', { default: MCP_SCOPE.USER });
 const servers = ref<McpServer[]>([]);
 const loading = ref(false);
 const saving = ref(false);
@@ -62,39 +40,19 @@ const testingId = ref('');
 const togglingServers = reactive(new Set<string>());
 const dialogVisible = ref(false);
 const selectedId = ref('');
-const dialogMode = ref<DialogMode>('create');
 const form = reactive<McpForm>(emptyForm());
 let loadRequestId = 0;
 
-const isInternalPublic = computed(() => form.scope === MCP_SCOPE.INTERNAL_PUBLIC);
-const editingId = computed(() => dialogMode.value === 'edit' ? selectedId.value : '');
-const configurationReadOnly = computed(() => dialogMode.value === 'view' || dialogMode.value === 'credential');
-const editingCredential = computed(() => dialogMode.value === 'credential');
-const visibleServers = computed(() => servers.value.filter((server) => activeScope.value === MCP_SCOPE.PUBLIC
-  ? server.scope !== MCP_SCOPE.USER
-  : server.scope === MCP_SCOPE.USER));
-const dialogTitle = computed(() => {
-  if (editingCredential.value) return '配置凭据型公共 MCP';
-  if (configurationReadOnly.value) return '公共 MCP';
-  return editingId.value ? '修改 MCP' : '创建 MCP';
-});
-const dialogDescription = computed(() => {
-  if (editingCredential.value) return '配置你的访问 Key，即可在 Agent 中使用这项公共能力。';
-  if (configurationReadOnly.value) return '查看平台提供的公共 MCP 能力。';
-  return editingId.value ? '调整连接参数，保存后将在下一轮对话生效。' : '连接一个 MCP 服务，为 Agent 扩展新的工具能力。';
-});
+const editingId = computed(() => selectedId.value);
+const dialogTitle = computed(() => editingId.value ? '修改 MCP' : '创建 MCP');
+const dialogDescription = computed(() => editingId.value
+  ? '调整连接参数，保存后将在下一轮对话生效。' : '连接一个 MCP 服务，为 Agent 扩展新的工具能力。');
 
 async function loadServers(): Promise<void> {
   const requestId = ++loadRequestId;
-  const administrator = props.administrator;
   loading.value = true;
   try {
-    const visible = await listMcpServers();
-    let loadedServers = visible;
-    if (administrator) {
-      const publicServers = await listPublicMcpServers();
-      loadedServers = mergeMcpManagementServers(visible, publicServers);
-    }
+    const loadedServers = await listMcpServers();
     if (requestId === loadRequestId) servers.value = loadedServers;
   } catch (error) {
     if (requestId === loadRequestId) {
@@ -107,17 +65,11 @@ async function loadServers(): Promise<void> {
 
 function emptyForm(): McpForm {
   return {
-    scope: activeScope.value === MCP_SCOPE.PUBLIC ? MCP_SCOPE.PUBLIC : MCP_SCOPE.USER,
     name: '',
     description: '',
-    transportType: MCP_TRANSPORT_TYPE.STREAMABLE_HTTP,
     endpoint: '',
-    command: '',
-    argumentsText: '',
     headers: [],
     queryParameters: [],
-    environment: [],
-    userCredential: '',
     enabled: true,
     requestTimeoutSeconds: 60,
     initializationTimeoutSeconds: 30,
@@ -126,7 +78,6 @@ function emptyForm(): McpForm {
 
 function openCreate(): void {
   selectedId.value = '';
-  dialogMode.value = 'create';
   Object.assign(form, emptyForm());
   dialogVisible.value = true;
 }
@@ -135,14 +86,6 @@ defineExpose({ openCreate });
 
 function openServer(server: McpServer): void {
   selectedId.value = server.id;
-  dialogMode.value = server.editable ? 'edit' : 'view';
-  populateForm(server);
-  dialogVisible.value = true;
-}
-
-function openCredential(server: McpServer): void {
-  selectedId.value = server.id;
-  dialogMode.value = 'credential';
   populateForm(server);
   dialogVisible.value = true;
 }
@@ -150,43 +93,27 @@ function openCredential(server: McpServer): void {
 function populateForm(server: McpServer): void {
   Object.assign(form, {
     name: server.name,
-    scope: server.scope,
     description: server.description,
-    transportType: server.transportType,
     endpoint: server.endpoint || '',
-    command: server.command || '',
-    argumentsText: server.arguments.join('\n'),
     headers: toRows(server.headers),
     queryParameters: toRows(server.queryParameters),
-    environment: toRows(server.environment),
-    userCredential: '',
     enabled: server.enabled,
     requestTimeoutSeconds: server.requestTimeoutSeconds,
     initializationTimeoutSeconds: server.initializationTimeoutSeconds,
   });
 }
 
-function statusText(server: McpServer): string {
-  if (server.userCredentialRequired && !server.userCredentialConfigured) return '待配置';
-  if (!server.enabled) return '服务已停用';
-  return server.userEnabled ? '已启用' : '已停用';
-}
-
 async function toggleServer(server: McpServer): Promise<void> {
   if (togglingServers.has(server.id)) return;
   togglingServers.add(server.id);
   try {
-    server.userEnabled = await setMcpServerEnabled(server, !server.userEnabled);
-    ElMessage.success(`MCP 已${server.userEnabled ? '启用' : '停用'}，下一轮对话生效`);
+    server.enabled = await setMcpServerEnabled(server.id, !server.enabled);
+    ElMessage.success(`MCP 已${server.enabled ? '启用' : '停用'}，下一轮对话生效`);
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '启用状态保存失败');
   } finally {
     togglingServers.delete(server.id);
   }
-}
-
-function credentialActionText(server: McpServer): string {
-  return server.userCredentialConfigured ? '更新凭证' : '配置凭证';
 }
 
 function toRows(values: Record<string, string>): KeyValueRow[] {
@@ -226,42 +153,25 @@ function toRecord(
   return values;
 }
 
-function buildPayload(): PublicMcpServerPayload {
+function buildPayload(): McpServerPayload {
   if (!form.name.trim() || !form.description.trim()) {
     throw new Error('请填写完整的 MCP 名称和描述');
   }
-  const transportType = form.transportType;
-  const streamableHttp = transportType === MCP_TRANSPORT_TYPE.STREAMABLE_HTTP;
   const preserveEmptyCredential = Boolean(editingId.value);
-  if (streamableHttp && !form.endpoint.trim()) {
+  if (!form.endpoint.trim()) {
     throw new Error('请填写 Streamable HTTP 服务地址');
   }
-  if (!streamableHttp && !form.command.trim()) {
-    throw new Error('请填写 STDIO 启动命令');
-  }
-  const payload: PublicMcpServerPayload = {
+  const payload: McpServerPayload = {
     name: form.name.trim(),
     description: form.description.trim(),
-    transportType,
-    endpoint: streamableHttp ? form.endpoint.trim() : undefined,
-    command: streamableHttp ? undefined : form.command.trim(),
-    arguments: streamableHttp
-      ? []
-      : form.argumentsText.split('\n').map((argument) => argument.trim()).filter(Boolean),
-    headers: streamableHttp ? toRecord(form.headers, 'Header', preserveEmptyCredential) : {},
-    queryParameters: streamableHttp
-      ? toRecord(form.queryParameters, '查询参数', preserveEmptyCredential)
-      : {},
-    environment: streamableHttp
-      ? {}
-      : toRecord(form.environment, '环境变量', preserveEmptyCredential),
+    transportType: MCP_TRANSPORT_TYPE.STREAMABLE_HTTP,
+    endpoint: form.endpoint.trim(),
+    headers: toRecord(form.headers, 'Header', preserveEmptyCredential),
+    queryParameters: toRecord(form.queryParameters, '查询参数', preserveEmptyCredential),
     enabled: form.enabled,
     requestTimeoutSeconds: form.requestTimeoutSeconds,
     initializationTimeoutSeconds: form.initializationTimeoutSeconds,
   };
-  if (activeScope.value === MCP_SCOPE.PUBLIC) {
-    if (!editingId.value) payload.scope = form.scope;
-  }
   return payload;
 }
 
@@ -270,39 +180,12 @@ async function saveServer(): Promise<void> {
   try {
     const payload = buildPayload();
     if (editingId.value) {
-      if (activeScope.value === MCP_SCOPE.PUBLIC) {
-        await updatePublicMcpServer(editingId.value, payload);
-      } else {
-        await updateUserMcpServer(editingId.value, payload as McpServerPayload);
-      }
+      await updateUserMcpServer(editingId.value, payload);
       ElMessage.success('MCP 已更新，下一次对话将加载新配置');
     } else {
-      if (activeScope.value === MCP_SCOPE.PUBLIC) {
-        await createPublicMcpServer(payload);
-      } else {
-        await createUserMcpServer(payload as McpServerPayload);
-      }
+      await createUserMcpServer(payload);
       ElMessage.success('MCP 已创建');
     }
-    dialogVisible.value = false;
-    await loadServers();
-  } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : '保存失败');
-  } finally {
-    saving.value = false;
-  }
-}
-
-async function saveUserCredential(): Promise<void> {
-  const credential = form.userCredential.trim();
-  if (!credential) {
-    ElMessage.error('请填写用户凭证');
-    return;
-  }
-  saving.value = true;
-  try {
-    const server = await updateMcpUserCredential(selectedId.value, { credential });
-    ElMessage.success(server.enabled ? '凭证已配置，MCP 已启用' : '凭证已配置');
     dialogVisible.value = false;
     await loadServers();
   } catch (error) {
@@ -319,7 +202,7 @@ async function removeServer(server: McpServer): Promise<void> {
       cancelButtonText: '取消',
       type: 'warning',
     });
-    await (server.scope === MCP_SCOPE.USER ? deleteUserMcpServer : deletePublicMcpServer)(server.id);
+    await deleteUserMcpServer(server.id);
     ElMessage.success('MCP 已删除');
     await loadServers();
   } catch (error) {
@@ -332,7 +215,7 @@ async function removeServer(server: McpServer): Promise<void> {
 async function checkConnection(server: McpServer): Promise<void> {
   testingId.value = server.id;
   try {
-    const result = await testMcpConnection(server.scope, server.id);
+    const result = await testMcpConnection(server.id);
     ElMessage.success(
       result.toolNames.length
         ? `连接成功，发现 ${result.toolNames.length} 个工具`
@@ -346,43 +229,24 @@ async function checkConnection(server: McpServer): Promise<void> {
 }
 
 onMounted(loadServers);
-watch(() => props.administrator, (administrator, previous) => {
-  if (administrator !== previous) void loadServers();
-});
 </script>
 
 <template>
   <div class="mcp-management">
-    <div v-if="showScopeSwitch" class="scope-switch">
-      <button :class="{ active: activeScope === MCP_SCOPE.USER }" @click="activeScope = MCP_SCOPE.USER">
-        <el-icon><User /></el-icon>
-        我的 MCP
-      </button>
-      <button :class="{ active: activeScope === MCP_SCOPE.PUBLIC }" @click="activeScope = MCP_SCOPE.PUBLIC">
-        <el-icon>
-          <EditPen v-if="administrator" />
-          <Lock v-else />
-        </el-icon>
-        公共 MCP
-      </button>
-    </div>
-
-    <p v-if="showScopeSwitch" class="extension-enablement-hint">开关仅对我生效 · 下一轮对话生效</p>
     <div v-loading="loading" class="mcp-grid">
-      <article v-for="server in visibleServers" :key="server.id" class="mcp-card"
-        :class="{ 'extension-disabled': !server.enabled || !server.userEnabled }">
+      <article v-for="server in servers" :key="server.id" class="mcp-card"
+        :class="{ 'extension-disabled': !server.enabled }">
         <div class="skill-card-head">
           <div class="extension-icon mcp"><el-icon><Connection /></el-icon></div>
           <div>
-            <span>{{ server.scope === MCP_SCOPE.USER ? '个人 MCP' : '公共 MCP' }}</span>
+            <span>MCP</span>
             <h2>{{ server.name }}</h2>
           </div>
-          <div class="extension-enablement"
-            :title="server.enabled ? '仅对我生效，下一轮对话生效' : '服务配置已停用，启用服务后可切换个人开关'">
-            <span>{{ statusText(server) }}</span>
-            <el-switch :model-value="server.enabled && server.userEnabled" :disabled="!server.enabled"
+          <div class="extension-enablement" title="下一轮对话生效">
+            <span>{{ server.enabled ? '已启用' : '已停用' }}</span>
+            <el-switch :model-value="server.enabled"
               :loading="togglingServers.has(server.id)"
-              :aria-label="`${server.userEnabled ? '停用' : '启用'} MCP ${server.name}（仅对我生效）`"
+              :aria-label="`${server.enabled ? '停用' : '启用'} MCP ${server.name}（仅对我生效）`"
               @change="toggleServer(server)" />
           </div>
         </div>
@@ -391,7 +255,7 @@ watch(() => props.administrator, (administrator, previous) => {
           <div>
             <dt>传输方式</dt>
             <dd>
-              {{ server.transportType === MCP_TRANSPORT_TYPE.STREAMABLE_HTTP ? 'Streamable HTTP' : 'STDIO' }}
+              Streamable HTTP
             </dd>
           </div>
           <div>
@@ -401,40 +265,27 @@ watch(() => props.administrator, (administrator, previous) => {
         </dl>
         <div class="skill-actions">
           <el-button
-            v-if="server.runtimeSupported && server.enabled && server.userEnabled
-              && (!server.userCredentialRequired || server.userCredentialConfigured)"
+            v-if="server.runtimeSupported && server.enabled"
             text
             :loading="testingId === server.id"
             @click="checkConnection(server)"
           >
             检测连接
           </el-button>
-          <el-button
-            v-if="server.userCredentialRequired"
-            text
-            :type="server.userCredentialConfigured ? undefined : 'primary'"
-            @click="openCredential(server)"
-          >
-            <el-icon><Key /></el-icon>
-            {{ credentialActionText(server) }}
-          </el-button>
-          <el-button v-if="server.editable" text @click="openServer(server)">
+          <el-button text @click="openServer(server)">
             <el-icon><EditPen /></el-icon>
             编辑
           </el-button>
-          <el-button v-else-if="!server.userCredentialRequired" text @click="openServer(server)">
-            查看
-          </el-button>
-          <el-button v-if="server.editable" text class="danger-action" @click="removeServer(server)">
+          <el-button text class="danger-action" @click="removeServer(server)">
             <el-icon><Delete /></el-icon>
             删除
           </el-button>
         </div>
       </article>
       <el-empty
-        v-if="!loading && !visibleServers.length"
+        v-if="!loading && !servers.length"
         :image-size="56"
-        :description="activeScope === MCP_SCOPE.USER ? '还没有个人 MCP' : '暂无公共 MCP'"
+        description="还没有 MCP"
       >
         <template #image>
           <span class="empty-state-icon" aria-hidden="true"><el-icon><Connection /></el-icon></span>
@@ -454,11 +305,10 @@ watch(() => props.administrator, (administrator, previous) => {
         <div class="mcp-dialog-heading">
           <div class="mcp-dialog-heading-icon"><el-icon><Connection /></el-icon></div>
           <div>
-            <span>{{ activeScope === MCP_SCOPE.PUBLIC ? 'PLATFORM MCP' : 'PERSONAL MCP' }}</span>
+            <span>我的 MCP</span>
             <strong>{{ dialogTitle }}</strong>
             <p>{{ dialogDescription }}</p>
           </div>
-          <el-tag v-if="isInternalPublic" effect="plain">用户独立凭据</el-tag>
         </div>
       </template>
 
@@ -476,7 +326,7 @@ watch(() => props.administrator, (administrator, previous) => {
             <el-form-item label="MCP 名称">
               <el-input
                 v-model="form.name"
-                :disabled="Boolean(editingId) || configurationReadOnly"
+                :disabled="Boolean(editingId)"
                 maxlength="64"
                 placeholder="例如：internal-search"
               >
@@ -485,17 +335,13 @@ watch(() => props.administrator, (administrator, previous) => {
               <small class="field-tip">将用于生成 mcp__名称__工具名。</small>
             </el-form-item>
             <el-form-item label="传输方式">
-              <el-select v-model="form.transportType" :disabled="configurationReadOnly">
-                <el-option label="Streamable HTTP" :value="MCP_TRANSPORT_TYPE.STREAMABLE_HTTP" />
-                <el-option label="STDIO" :value="MCP_TRANSPORT_TYPE.STDIO" />
-              </el-select>
+              <el-input model-value="Streamable HTTP" disabled />
             </el-form-item>
           </div>
 
           <el-form-item label="用途描述">
             <el-input
               v-model="form.description"
-              :disabled="configurationReadOnly"
               type="textarea"
               :rows="3"
               maxlength="500"
@@ -505,7 +351,7 @@ watch(() => props.administrator, (administrator, previous) => {
             />
           </el-form-item>
 
-          <div v-if="!configurationReadOnly" class="mcp-enable-row">
+          <div class="mcp-enable-row">
             <div>
               <strong>启用 MCP</strong>
               <span>关闭后保留配置，但不会加载到 Agent。</span>
@@ -518,118 +364,60 @@ watch(() => props.administrator, (administrator, previous) => {
           <header class="mcp-form-section-heading">
             <span><el-icon><Link /></el-icon></span>
             <div>
-              <strong>{{ editingCredential ? '访问凭证' : '连接配置' }}</strong>
-              <p v-if="editingCredential">凭证仅对当前账号生效，不会共享给其他用户。</p>
-              <p v-else>填写服务入口，平台会在保存时检查配置格式。</p>
+              <strong>连接配置</strong>
+              <p>填写服务入口，平台会在保存时检查配置格式。</p>
             </div>
           </header>
 
-          <template v-if="configurationReadOnly">
-            <div class="mcp-runtime-note">
-              <el-icon><Lock /></el-icon>
-              <p v-if="editingCredential">
-                凭据型公共 MCP 由平台统一维护，填写你自己的凭证后仅对当前用户启用。
-              </p>
-              <p v-else>公共 MCP 由平台统一维护，当前用户可直接使用。</p>
-            </div>
-            <el-form-item v-if="editingCredential" label="你的访问 Key">
-              <el-input
-                v-model="form.userCredential"
-                show-password
-                maxlength="2048"
-                placeholder="粘贴访问 Key"
-              >
-                <template #prefix><el-icon><Key /></el-icon></template>
-              </el-input>
-              <small class="field-tip">鉴权值不会回显，新值会覆盖当前用户的旧值。</small>
-            </el-form-item>
-          </template>
-
-          <template v-else-if="form.transportType === MCP_TRANSPORT_TYPE.STREAMABLE_HTTP">
-            <el-form-item label="服务地址">
-              <el-input
-                v-model="form.endpoint"
-                maxlength="2048"
-                placeholder="https://mcp.example.com/mcp"
-              >
-                <template #prefix><el-icon><Link /></el-icon></template>
-              </el-input>
-              <small class="field-tip">可以在地址中携带固定查询参数。</small>
-            </el-form-item>
-          </template>
-
-          <template v-else>
-            <div class="form-grid">
-              <el-form-item label="启动命令">
-                <el-input v-model="form.command" maxlength="512" placeholder="例如：npx" />
-              </el-form-item>
-              <el-form-item label="启动参数">
-                <el-input
-                  v-model="form.argumentsText"
-                  type="textarea"
-                  :rows="2"
-                  resize="none"
-                  placeholder="每行一个参数"
-                />
-              </el-form-item>
-            </div>
-          </template>
+          <el-form-item label="服务地址">
+            <el-input
+              v-model="form.endpoint"
+              maxlength="2048"
+              placeholder="https://mcp.example.com/mcp"
+            >
+              <template #prefix><el-icon><Link /></el-icon></template>
+            </el-input>
+            <small class="field-tip">可以在地址中携带固定查询参数。</small>
+          </el-form-item>
         </section>
 
-        <details v-if="!configurationReadOnly" class="mcp-advanced-config">
+        <details class="mcp-advanced-config">
           <summary>
             <span class="mcp-advanced-icon"><el-icon><Setting /></el-icon></span>
             <span>
               <strong>高级配置</strong>
-              <small>凭证参数、环境变量和超时设置</small>
+              <small>HTTP 凭证参数和超时设置</small>
             </span>
             <el-icon class="mcp-advanced-arrow"><ArrowDown /></el-icon>
           </summary>
           <div class="mcp-advanced-content">
-            <template v-if="form.transportType === MCP_TRANSPORT_TYPE.STREAMABLE_HTTP">
-              <section class="mcp-key-value-section">
-                <header>
-                  <div>
-                    <strong>HTTP Header</strong>
-                    <small>编辑时值留空表示保留原值。</small>
-                  </div>
-                  <el-button text @click="addRow(form.headers)">添加一项</el-button>
-                </header>
-                <div v-for="(row, index) in form.headers" :key="index" class="mcp-key-value-row">
-                  <el-input v-model="row.key" placeholder="Header 名称" />
-                  <el-input v-model="row.value" show-password placeholder="Header 值" />
-                  <el-button text class="danger-action" @click="removeRow(form.headers, index)">删除</el-button>
-                </div>
-              </section>
-
-              <section class="mcp-key-value-section">
-                <header>
-                  <div>
-                    <strong>查询参数</strong>
-                    <small>编辑时值留空表示保留原值。</small>
-                  </div>
-                  <el-button text @click="addRow(form.queryParameters)">添加一项</el-button>
-                </header>
-                <div v-for="(row, index) in form.queryParameters" :key="index" class="mcp-key-value-row">
-                  <el-input v-model="row.key" placeholder="参数名称" />
-                  <el-input v-model="row.value" show-password placeholder="参数值" />
-                  <el-button text class="danger-action" @click="removeRow(form.queryParameters, index)">删除</el-button>
-                </div>
-              </section>
-            </template>
-
-            <section v-else class="mcp-key-value-section">
+            <section class="mcp-key-value-section">
               <header>
                 <div>
-                  <strong>环境变量</strong>
+                  <strong>HTTP Header</strong>
                   <small>编辑时值留空表示保留原值。</small>
                 </div>
-                <el-button text @click="addRow(form.environment)">添加一项</el-button>
+                <el-button text @click="addRow(form.headers)">添加一项</el-button>
               </header>
-              <div v-for="(row, index) in form.environment" :key="index" class="mcp-key-value-row">
-                <el-input v-model="row.key" placeholder="变量名称" />
-                <el-input v-model="row.value" show-password placeholder="变量值" />
-                <el-button text class="danger-action" @click="removeRow(form.environment, index)">删除</el-button>
+              <div v-for="(row, index) in form.headers" :key="index" class="mcp-key-value-row">
+                <el-input v-model="row.key" placeholder="Header 名称" />
+                <el-input v-model="row.value" show-password placeholder="Header 值" />
+                <el-button text class="danger-action" @click="removeRow(form.headers, index)">删除</el-button>
+              </div>
+            </section>
+
+            <section class="mcp-key-value-section">
+              <header>
+                <div>
+                  <strong>查询参数</strong>
+                  <small>编辑时值留空表示保留原值。</small>
+                </div>
+                <el-button text @click="addRow(form.queryParameters)">添加一项</el-button>
+              </header>
+              <div v-for="(row, index) in form.queryParameters" :key="index" class="mcp-key-value-row">
+                <el-input v-model="row.key" placeholder="参数名称" />
+                <el-input v-model="row.value" show-password placeholder="参数值" />
+                <el-button text class="danger-action" @click="removeRow(form.queryParameters, index)">删除</el-button>
               </div>
             </section>
 
@@ -649,18 +437,10 @@ watch(() => props.administrator, (administrator, previous) => {
 
       <template #footer>
         <div class="mcp-dialog-footer">
-          <span v-if="!configurationReadOnly">保存后将在下一轮对话中加载新配置。</span>
+          <span>保存后将在下一轮对话中加载新配置。</span>
           <div>
-            <el-button @click="dialogVisible = false">{{ configurationReadOnly ? '关闭' : '取消' }}</el-button>
-            <el-button
-              v-if="editingCredential"
-              type="primary"
-              :loading="saving"
-              @click="saveUserCredential"
-            >
-              保存并启用
-            </el-button>
-            <el-button v-if="!configurationReadOnly" type="primary" :loading="saving" @click="saveServer">
+            <el-button @click="dialogVisible = false">取消</el-button>
+            <el-button type="primary" :loading="saving" @click="saveServer">
               {{ editingId ? '保存修改' : '创建 MCP' }}
             </el-button>
           </div>

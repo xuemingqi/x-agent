@@ -36,15 +36,6 @@ public class UserController implements UserApi {
 
     @Override
     @Internal
-    @Operation(summary = "按用户 ID 获取内部用户信息")
-    @GetMapping("/id/{id}/info")
-    public BaseResult<UserDo> getUserById(@PathVariable("id") Long id) {
-        return userService.getUserById(id);
-    }
-
-
-    @Override
-    @Internal
     @Operation(tags = "User", summary = "获取用户信息", method = "/{mobile}/info", description = "获取用户信息")
     @Parameters({
             @Parameter(name = CommonConstant.INTERNAL_TOKEN, description = "内部请求token", in = ParameterIn.HEADER, required = true),

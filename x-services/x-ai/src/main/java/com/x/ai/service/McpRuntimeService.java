@@ -1,6 +1,6 @@
 package com.x.ai.service;
 
-import com.x.ai.common.model.ResourceEnablement;
+import com.x.ai.common.model.McpRuntimeSnapshot;
 import io.agentscope.core.tool.mcp.McpClientWrapper;
 
 import java.util.List;
@@ -8,11 +8,13 @@ import java.util.List;
 public interface McpRuntimeService {
 
     /**
-     * 获取当前用户可用的公共和个人 MCP 客户端。
-     * 重复命名空间和无法创建的客户端会被跳过，返回的客户端由调用方负责注册和关闭。
-     *
-     * @param userId 用户 ID
-     * @return 当前用户可用的 MCP 客户端
+     * 读取当前用户启用的 MCP 配置快照及指纹，使跨节点修改能替换旧运行时。
      */
-    List<McpClientWrapper> getVisibleClients(String userId, ResourceEnablement enablement);
+    McpRuntimeSnapshot load(String userId);
+
+    /**
+     * 按同一份配置快照创建 MCP 客户端；调用方负责注册和关闭返回的连接。
+     * 普通连接配置错误会跳过当前服务，取消任务则关闭本批次所有未交付连接。
+     */
+    List<McpClientWrapper> getClients(McpRuntimeSnapshot snapshot);
 }

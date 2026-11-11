@@ -1,6 +1,5 @@
 package com.x.ai.service.impl;
 
-import com.x.ai.common.constants.KnowledgeConstant;
 import com.x.ai.common.domain.KnowledgeDocumentDo;
 import com.x.ai.db.entity.KnowledgeDocument;
 import com.x.ai.db.enums.KnowledgeDocumentStatus;
@@ -110,15 +109,12 @@ class RagKnowledgeServiceImplTest {
     }
 
     @Test
-    void semanticSearchOnlyReceivesTheCurrentUserAndExplicitlyIncludedPublicOwner() {
+    void semanticSearchOnlyReceivesTheCurrentUser() {
         List<Double> vector = List.of(1.0, 0.1);
         when(embeddings.embed(List.of("退款规则"))).thenReturn(List.of(vector));
         when(documents.search(any(), any(), anyString(), anyInt(), anyDouble(), anyInt())).thenReturn(List.of());
-        service.search("42", "退款规则", 5, true);
-        verify(documents).search(eq(List.of("42", KnowledgeConstant.PUBLIC_OWNER)), eq(vector),
-                anyString(), anyInt(), anyDouble(), eq(5));
-        service.search("42", "退款规则", 5, false);
-        verify(documents).search(eq(List.of("42")), eq(vector), anyString(), anyInt(), anyDouble(), eq(5));
+        service.search("42", "退款规则", 5);
+        verify(documents).search(eq("42"), eq(vector), anyString(), anyInt(), anyDouble(), eq(5));
     }
 
     @Test
@@ -129,8 +125,8 @@ class RagKnowledgeServiceImplTest {
         assertThrows(XException.class, () -> service.chunks("42", "valid.txt", 0, 20));
         assertThrows(XException.class, () -> service.chunks("42", "valid.txt", 1, 101));
         assertThrows(XException.class, () -> service.upload("42", "program.exe", new byte[]{1}));
-        assertThrows(XException.class, () -> service.search("42", " ", 5, true));
-        assertThrows(XException.class, () -> service.search("42", "退款规则", 21, true));
+        assertThrows(XException.class, () -> service.search("42", " ", 5));
+        assertThrows(XException.class, () -> service.search("42", "退款规则", 21));
         verifyNoInteractions(documents, embeddings);
     }
 }

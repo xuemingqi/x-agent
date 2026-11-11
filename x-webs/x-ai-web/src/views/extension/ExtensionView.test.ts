@@ -3,23 +3,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp, defineComponent, h, nextTick } from 'vue';
 import { createPinia } from 'pinia';
 import { ElMessage } from 'element-plus';
-import { getAdministrationStatus } from '@/api/administration';
 
-import { importSkillArchive, listSkills, listPublicSkills, setSkillEnabled } from '@/api/skill';
+import { importSkillArchive, listSkills, setSkillEnabled } from '@/api/skill';
 import { useModelSettingStore } from '@/stores/model-setting';
-import { SKILL_SCOPE } from '@/types/skill';
 import type { AgentSkill } from '@/types/skill';
 import ExtensionView from './ExtensionView.vue';
 
 vi.mock('@/api/skill', () => ({
   listSkills: vi.fn().mockResolvedValue([]),
-  listPublicSkills: vi.fn().mockResolvedValue([]),
   setSkillEnabled: vi.fn(),
-  listPendingSkillShares: vi.fn().mockResolvedValue([]),
   importSkillArchive: vi.fn(),
   exportSkillArchive: vi.fn(),
 }));
-vi.mock('@/api/administration', () => ({ getAdministrationStatus: vi.fn().mockResolvedValue({ administrator: false, role: 'USER' }) }));
 vi.mock('@/components/extension/McpManagementPanel.vue', () => ({ default: { template: '<div />' } }));
 vi.mock('element-plus', () => ({
   ElMessage: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
@@ -27,15 +22,14 @@ vi.mock('element-plus', () => ({
 }));
 
 const importedSkill: AgentSkill = {
-  name: 'research', description: '调研', content: '# 调研', scope: SKILL_SCOPE.USER,
-  editable: true, enabled: true, sharedByMobile: null, resourcePaths: ['scripts/run.py'],
+  name: 'research', description: '调研', content: '# 调研',
+  enabled: true, resourcePaths: ['scripts/run.py'],
 };
 const cleanups: (() => void)[] = [];
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(listSkills).mockResolvedValue([]);
-  vi.mocked(getAdministrationStatus).mockResolvedValue({ administrator: false, role: 'USER' });
   vi.mocked(setSkillEnabled).mockImplementation(async (_, enabled) => enabled);
 });
 
@@ -150,20 +144,17 @@ describe('Skill archive import', () => {
 });
 
 describe('Skill enablement', () => {
-  it.each([
-    [SKILL_SCOPE.USER, '我的 Skill'], [SKILL_SCOPE.PUBLIC, '公共 Skill'], [SKILL_SCOPE.SHARED, '共享 Skill'],
-  ] as const)('allows toggling scope %s without editing its content', async (scope, tab) => {
-    const skill = { ...importedSkill, scope, editable: scope === SKILL_SCOPE.USER };
-    vi.mocked(listSkills).mockResolvedValue([skill]);
+  it('allows toggling an owned Skill and exposes editing without source tabs', async () => {
+    vi.mocked(listSkills).mockResolvedValue([importedSkill]);
     const { container } = await mountView();
-    Array.from(container.querySelectorAll('.scope-switch button')).find((button) => button.textContent?.includes(tab))!
-      .dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    await settle();
+    expect(container.querySelector('.scope-switch')).toBeNull();
+    expect(container.textContent).toContain('编辑');
+    expect(container.textContent).not.toContain('分享');
+    expect(container.textContent).not.toContain('邀请');
     const toggle = container.querySelector<HTMLButtonElement>('[role="switch"]')!;
-    expect(toggle.getAttribute('aria-checked')).toBe('true');
     toggle.click();
     await settle();
-    expect(setSkillEnabled).toHaveBeenCalledWith(expect.objectContaining({ scope, name: 'research' }), false);
+    expect(setSkillEnabled).toHaveBeenCalledWith(importedSkill.name, false);
     expect(toggle.getAttribute('aria-checked')).toBe('false');
     toggle.click();
     await settle();
@@ -186,15 +177,5 @@ describe('Skill enablement', () => {
     expect(toggle.getAttribute('aria-checked')).toBe('true');
     expect(toggle.disabled).toBe(false);
     expect(ElMessage.error).toHaveBeenCalledWith('保存失败');
-  });
-
-  it('shows an administrators persisted personal preference for public skills', async () => {
-    vi.mocked(getAdministrationStatus).mockResolvedValue({ administrator: true, role: 'ADMIN' });
-    vi.mocked(listPublicSkills).mockResolvedValue([{ ...importedSkill, scope: SKILL_SCOPE.PUBLIC, enabled: false }]);
-    const { container } = await mountView();
-    Array.from(container.querySelectorAll('.scope-switch button')).find((button) => button.textContent?.includes('公共 Skill'))!
-      .dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    await settle();
-    expect(container.querySelector('[role="switch"]')!.getAttribute('aria-checked')).toBe('false');
   });
 });

@@ -58,8 +58,8 @@ public interface KnowledgeDocumentIService {
     KnowledgeChunkPageDo chunks(String ownerId, String path, int page, int size);
 
     /**
-     * 在明确所有者集合内使用同一模型和维度进行 pgvector 余弦检索。
+     * 在指定用户文档内使用同一模型和维度进行 pgvector 余弦检索。
      */
-    List<KnowledgeSearchResultDo> search(List<String> owners, List<Double> embedding, String model,
+    List<KnowledgeSearchResultDo> search(String ownerId, List<Double> embedding, String model,
                                         int dimensions, double minimumScore, int limit);
 }

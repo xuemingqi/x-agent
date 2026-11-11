@@ -28,11 +28,6 @@ public interface HarnessAgentService {
     void evictUserAgents(String userId);
 
     /**
-     * 使所有缓存 Agent 失效，让后续调用加载最新公共 Skill 或 MCP 配置。
-     */
-    void evictAllAgents();
-
-    /**
      * 阻塞执行 HarnessAgent，并自动处理工具审批。
      *
      * @param agent HarnessAgent 实例

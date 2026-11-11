@@ -1,12 +1,10 @@
 package com.x.ai.controller;
 
+import com.x.ai.common.domain.McpConnectionTestDo;
+import com.x.ai.common.domain.McpServerDo;
+import com.x.ai.common.dto.McpServerCreateDto;
+import com.x.ai.common.dto.McpServerUpdateDto;
 import com.x.ai.common.dto.ResourceEnabledUpdateDto;
-import com.x.ai.mcp.api.domain.McpConnectionTestDo;
-import com.x.ai.mcp.api.domain.McpServerDo;
-import com.x.ai.mcp.api.dto.McpServerCreateDto;
-import com.x.ai.mcp.api.dto.McpServerUpdateDto;
-import com.x.ai.mcp.api.dto.McpUserCredentialUpdateDto;
-import com.x.ai.mcp.api.enums.McpScope;
 import com.x.ai.service.McpServerService;
 import com.x.framework.common.constants.CommonConstant;
 import com.x.framework.common.response.BaseResult;
@@ -25,7 +23,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -40,10 +37,10 @@ public class McpServerController {
     private final McpServerService mcpServerService;
 
     @Operation(summary = "修改当前用户的扩展启用状态")
-    @PutMapping("/{scope}/{id}/enabled")
-    public BaseResult<Boolean> setEnabled(@PathVariable int scope, @PathVariable Long id,
+    @PutMapping("/{id}/enabled")
+    public BaseResult<Boolean> setEnabled(@PathVariable Long id,
                                           @RequestBody @Valid ResourceEnabledUpdateDto request) {
-        return ResultUtil.buildResultSuccess(mcpServerService.setEnabled(McpScope.fromCode(scope), id, request.getEnabled()));
+        return ResultUtil.buildResultSuccess(mcpServerService.setEnabled(id, request.getEnabled()));
     }
 
 
@@ -52,17 +49,17 @@ public class McpServerController {
             @Parameter(name = CommonConstant.TOKEN, description = "token", in = ParameterIn.HEADER, required = true)
     })
     @GetMapping
-    public BaseResult<List<McpServerDo>> list(@RequestParam(required = false) Integer scope) {
-        return ResultUtil.buildResultSuccess(mcpServerService.list(scope == null ? null : McpScope.fromCode(scope)));
+    public BaseResult<List<McpServerDo>> list() {
+        return ResultUtil.buildResultSuccess(mcpServerService.list());
     }
 
     @Operation(summary = "查询 MCP 服务详情")
     @Parameters({
             @Parameter(name = CommonConstant.TOKEN, description = "token", in = ParameterIn.HEADER, required = true)
     })
-    @GetMapping("/{scope}/{id}")
-    public BaseResult<McpServerDo> get(@PathVariable int scope, @PathVariable Long id) {
-        return ResultUtil.buildResultSuccess(mcpServerService.get(McpScope.fromCode(scope), id));
+    @GetMapping("/{id}")
+    public BaseResult<McpServerDo> get(@PathVariable Long id) {
+        return ResultUtil.buildResultSuccess(mcpServerService.get(id));
     }
 
     @Operation(summary = "创建当前用户 MCP 服务")
@@ -83,16 +80,6 @@ public class McpServerController {
         return ResultUtil.buildResultSuccess(mcpServerService.update(id, request));
     }
 
-    @Operation(summary = "配置当前用户的公司内部公共 MCP 凭证")
-    @Parameters({
-            @Parameter(name = CommonConstant.TOKEN, description = "token", in = ParameterIn.HEADER, required = true)
-    })
-    @PutMapping("/internal-public/{id}/credential")
-    public BaseResult<McpServerDo> updateUserCredential(@PathVariable Long id,
-                                                        @RequestBody @Valid McpUserCredentialUpdateDto request) {
-        return ResultUtil.buildResultSuccess(mcpServerService.updateUserCredential(id, request));
-    }
-
     @Operation(summary = "删除当前用户 MCP 服务")
     @Parameters({
             @Parameter(name = CommonConstant.TOKEN, description = "token", in = ParameterIn.HEADER, required = true)
@@ -106,8 +93,8 @@ public class McpServerController {
     @Parameters({
             @Parameter(name = CommonConstant.TOKEN, description = "token", in = ParameterIn.HEADER, required = true)
     })
-    @PostMapping("/{scope}/{id}/connection-test")
-    public BaseResult<McpConnectionTestDo> testConnection(@PathVariable int scope, @PathVariable Long id) {
-        return ResultUtil.buildResultSuccess(mcpServerService.testConnection(McpScope.fromCode(scope), id));
+    @PostMapping("/{id}/connection-test")
+    public BaseResult<McpConnectionTestDo> testConnection(@PathVariable Long id) {
+        return ResultUtil.buildResultSuccess(mcpServerService.testConnection(id));
     }
 }

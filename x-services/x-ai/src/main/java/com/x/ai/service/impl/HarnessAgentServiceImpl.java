@@ -8,6 +8,7 @@ import com.x.ai.common.model.AgentRuntime;
 import com.x.ai.common.model.AgentRuntimeConfiguration;
 import com.x.ai.common.model.ResourceEnablement;
 import com.x.ai.common.model.SkillRuntimeSnapshot;
+import com.x.ai.common.model.McpRuntimeSnapshot;
 import com.x.ai.common.model.AiModelRuntimeConfig;
 import com.x.ai.converter.MultimodalOpenAIFormatter;
 import com.x.ai.decorator.MultimodalOpenAITransportDecorator;
@@ -18,11 +19,9 @@ import com.x.framework.common.utils.JsonUtil;
 import com.x.framework.common.utils.StringUtil;
 import com.x.ai.properties.AgentProperties;
 import com.x.ai.sandbox.docker.StreamingDockerSandboxClient;
-import com.x.ai.service.AdministratorAuthorizationService;
 import com.x.ai.service.AgentScopeStoreService;
 import com.x.ai.service.HarnessAgentService;
 import com.x.ai.service.McpRuntimeService;
-import com.x.ai.service.PublicResourceVersionService;
 import com.x.ai.service.ResourceEnablementService;
 import com.x.ai.service.SkillRuntimeService;
 import com.x.ai.skill.SkillRuntimeWorkspace;
@@ -33,9 +32,7 @@ import com.x.ai.tool.KnowledgeLinkManagementTools;
 import com.x.ai.tool.KnowledgeLinkTools;
 import com.x.ai.tool.KnowledgeSearchTools;
 import com.x.ai.tool.McpServerTools;
-import com.x.ai.tool.PublicAdministrationTools;
 import com.x.ai.tool.SkillManagementTools;
-import com.x.ai.tool.SkillShareTools;
 import com.x.ai.tool.middleware.ConversationFileMiddleware;
 import com.x.ai.tool.middleware.InterruptResponseMiddleware;
 import com.x.ai.tool.middleware.MultimodalResponseMiddleware;
@@ -125,12 +122,6 @@ public class HarnessAgentServiceImpl implements HarnessAgentService, AutoCloseab
 
     private final ObjectProvider<McpServerTools> mcpServerTools;
 
-    private final ObjectProvider<PublicAdministrationTools> publicAdministrationTools;
-
-    private final ObjectProvider<SkillShareTools> skillShareTools;
-
-    private final AdministratorAuthorizationService administratorAuthorizationService;
-
     private final SkillRuntimeService skillRuntimeService;
 
     private final ObjectProvider<SkillManagementTools> skillManagementTools;
@@ -138,8 +129,6 @@ public class HarnessAgentServiceImpl implements HarnessAgentService, AutoCloseab
     private final McpRuntimeService mcpRuntimeService;
 
     private final StreamingDockerSandboxClient streamingDockerSandboxClient;
-
-    private final PublicResourceVersionService publicResourceVersionService;
 
     private final ResourceEnablementService resourceEnablementService;
 
@@ -159,12 +148,13 @@ public class HarnessAgentServiceImpl implements HarnessAgentService, AutoCloseab
         Long modelId = model.getModelId();
         ResourceEnablement enablement = resourceEnablementService.get(userId);
         SkillRuntimeSnapshot skills = skillRuntimeService.load(userId, enablement);
-        AgentRuntimeConfiguration configuration = runtimeConfiguration(model, userId, enablement, skills);
+        McpRuntimeSnapshot mcps = mcpRuntimeService.load(userId);
+        AgentRuntimeConfiguration configuration = runtimeConfiguration(model, enablement, skills, mcps);
         checkAgentCreationInterrupted();
         ConcurrentMap<Long, AgentRuntime> userRuntimes = agentRuntimes.computeIfAbsent(userId, ignored -> new ConcurrentHashMap<>());
         return userRuntimes.compute(modelId, (ignored, current)
                         -> current != null && current.getConfiguration().equals(configuration)
-                        ? current : replaceAgent(current, model, userId, configuration, skills))
+                        ? current : replaceAgent(current, model, configuration, skills, mcps))
                 .getAgent();
     }
 
@@ -177,15 +167,6 @@ public class HarnessAgentServiceImpl implements HarnessAgentService, AutoCloseab
         if (runtimes != null) {
             retiredAgents.addAll(runtimes.values());
         }
-    }
-
-    @Override
-    public void evictAllAgents() {
-        agentRuntimes.forEach((userId, userRuntimes) -> {
-            if (agentRuntimes.remove(userId, userRuntimes)) {
-                retiredAgents.addAll(userRuntimes.values());
-            }
-        });
     }
 
     @Override
@@ -209,16 +190,15 @@ public class HarnessAgentServiceImpl implements HarnessAgentService, AutoCloseab
     }
 
     /**
-     * 模型内容、实时角色和用户扩展快照共同决定缓存是否可复用。
+     * 模型内容和当前用户的扩展快照共同决定缓存是否可复用。
      */
-    private AgentRuntimeConfiguration runtimeConfiguration(AiModelRuntimeConfig model, String userId,
-                                                           ResourceEnablement enablement, SkillRuntimeSnapshot skills) {
+    private AgentRuntimeConfiguration runtimeConfiguration(AiModelRuntimeConfig model, ResourceEnablement enablement,
+                                                           SkillRuntimeSnapshot skills, McpRuntimeSnapshot mcps) {
         return AgentRuntimeConfiguration.builder()
                 .modelFingerprint(StringUtil.sha256Hex(JsonUtil.toJsonStrOrThrow(Arrays.asList(model.getBaseUrl(),
                         model.getModelName(), model.getApiKey(), model.getContextWindowSize(), model.getTemperature()))))
                 .multimodalCapability(model.getMultimodalCapability())
-                .administrator(resolveAdministrator(userId))
-                .publicResourceVersion(publicResourceVersionService.currentVersion())
+                .mcpFingerprint(mcps.getFingerprint())
                 .enablement(enablement)
                 .skillFingerprint(skills.getFingerprint())
                 .build();
@@ -227,9 +207,9 @@ public class HarnessAgentServiceImpl implements HarnessAgentService, AutoCloseab
     /**
      * 构建配置变化时替换 Agent，旧实例保留到统一关闭以免中断正在执行的任务。
      */
-    private AgentRuntime replaceAgent(AgentRuntime current, AiModelRuntimeConfig model, String userId,
-                                      AgentRuntimeConfiguration configuration, SkillRuntimeSnapshot skills) {
-        AgentRuntime replacement = createAgent(model, userId, configuration, skills);
+    private AgentRuntime replaceAgent(AgentRuntime current, AiModelRuntimeConfig model,
+                                      AgentRuntimeConfiguration configuration, SkillRuntimeSnapshot skills, McpRuntimeSnapshot mcps) {
+        AgentRuntime replacement = createAgent(model, configuration, skills, mcps);
         if (Thread.currentThread().isInterrupted()) {
             replacement.shutdown();
             throw new CancellationException("Agent initialization interrupted");
@@ -241,30 +221,15 @@ public class HarnessAgentServiceImpl implements HarnessAgentService, AutoCloseab
     }
 
     /**
-     * 用户服务临时不可用时只注册普通工具，公共写操作仍会单独校验实时权限。
-     */
-    private boolean resolveAdministrator(String userId) {
-        try {
-            return administratorAuthorizationService.isAdministrator(userId);
-        } catch (XException error) {
-            if (error.getResponseCodeEnum() != ResponseCodeEnum.ADMIN_AUTHORIZATION_UNAVAILABLE) {
-                throw error;
-            }
-            log.warn("Administrator status unavailable, build regular user agent, userId={}", userId);
-            return false;
-        }
-    }
-
-    /**
      * 使用平台固定能力和当前用户可见的 MCP 构建独享 HarnessAgent。
      */
-    private AgentRuntime createAgent(AiModelRuntimeConfig model, String userId,
-                                     AgentRuntimeConfiguration configuration, SkillRuntimeSnapshot skills) {
+    private AgentRuntime createAgent(AiModelRuntimeConfig model, AgentRuntimeConfiguration configuration,
+                                     SkillRuntimeSnapshot skills, McpRuntimeSnapshot mcps) {
         checkAgentCreationInterrupted();
         DistributedStore runtimeStore = agentScopeStoreService.createRuntimeStore();
         DockerFilesystemSpec filesystem = createFilesystem(createUserWorkspaceSpec(), runtimeStore);
-        Toolkit toolkit = createToolkit(configuration.isAdministrator());
-        List<McpClientWrapper> mcpClients = registerMcpClients(toolkit, userId, configuration.getEnablement());
+        Toolkit toolkit = createToolkit();
+        List<McpClientWrapper> mcpClients = registerMcpClients(toolkit, mcps);
         SkillRuntimeWorkspace workspace = null;
         try {
             checkAgentCreationInterrupted();
@@ -286,9 +251,9 @@ public class HarnessAgentServiceImpl implements HarnessAgentService, AutoCloseab
     }
 
     /**
-     * 注册当前用户通用能力；公共管理工具仅授予实时管理员。
+     * 注册所有用户一致的个人资源管理能力。
      */
-    private Toolkit createToolkit(boolean administrator) {
+    private Toolkit createToolkit() {
         Toolkit toolkit = new Toolkit();
         toolkit.registerTool(conversationFileTools.getObject());
         toolkit.registerTool(browserScreenshotTools.getObject());
@@ -297,11 +262,7 @@ public class HarnessAgentServiceImpl implements HarnessAgentService, AutoCloseab
         toolkit.registerTool(agentScheduleTools.getObject());
         toolkit.registerTool(mcpServerTools.getObject());
         toolkit.registerTool(knowledgeLinkManagementTools.getObject());
-        toolkit.registerTool(skillShareTools.getObject());
         toolkit.registerTool(skillManagementTools.getObject());
-        if (administrator) {
-            toolkit.registerTool(publicAdministrationTools.getObject());
-        }
         return toolkit;
     }
 
@@ -347,8 +308,8 @@ public class HarnessAgentServiceImpl implements HarnessAgentService, AutoCloseab
     /**
      * 全部注册完成后才保留成功客户端；中途终止时释放未保留连接，避免重复关闭 SDK 已回收的失败连接。
      */
-    private List<McpClientWrapper> registerMcpClients(Toolkit toolkit, String userId, ResourceEnablement enablement) {
-        List<McpClientWrapper> clients = mcpRuntimeService.getVisibleClients(userId, enablement);
+    private List<McpClientWrapper> registerMcpClients(Toolkit toolkit, McpRuntimeSnapshot mcps) {
+        List<McpClientWrapper> clients = mcpRuntimeService.getClients(mcps);
         Set<McpClientWrapper> retainedClients = new HashSet<>();
         Set<McpClientWrapper> releasedClients = new HashSet<>();
         try {

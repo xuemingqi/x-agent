@@ -7,7 +7,7 @@ import org.redisson.api.listener.MessageListener;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
-/** Redis operations used by authentication, public-resource versioning and task interruption. */
+/** Redis operations used by authentication and task interruption. */
 public class RedisUtil {
 
     private final RedissonClient redissonClient;

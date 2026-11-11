@@ -21,11 +21,6 @@ public class UserApiFallbackFactory implements FallbackFactory<UserApi> {
     public UserApi create(Throwable cause) {
         return new UserApi() {
             @Override
-            public BaseResult<UserDo> getUserById(Long id) {
-                return ResultUtil.buildGeneralResultError();
-            }
-
-            @Override
             public BaseResult<UserDo> getUserInfo(String mobile) {
                 log.info("get user server error,fallback!");
                 return ResultUtil.buildGeneralResultError();

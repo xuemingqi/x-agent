@@ -35,9 +35,6 @@ public class UserDo {
     @Schema(name = "mobile", description = "手机号")
     private String mobile;
 
-    @Schema(name = "isAdmin", description = "是否为系统管理员")
-    private Boolean isAdmin;
-
     @Schema(name = "updateTime", description = "更新时间")
     private LocalDateTime updateTime;
 

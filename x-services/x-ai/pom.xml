@@ -35,11 +35,6 @@
             <version>1.27.1</version>
         </dependency>
         <dependency>
-            <groupId>com.x.api.contact</groupId>
-            <artifactId>x-contact-api</artifactId>
-            <version>${project.parent.version}</version>
-        </dependency>
-        <dependency>
             <groupId>com.x.framework.common</groupId>
             <artifactId>x-framework-common</artifactId>
             <version>${project.parent.version}</version>
@@ -75,9 +70,9 @@
             <version>${project.parent.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.x.api.ai.mcp</groupId>
-            <artifactId>x-ai-mcp-runtime-api</artifactId>
-            <version>${project.parent.version}</version>
+            <groupId>io.modelcontextprotocol.sdk</groupId>
+            <artifactId>mcp</artifactId>
+            <version>${mcp-sdk.version}</version>
         </dependency>
         <dependency>
             <groupId>com.x.api.auth</groupId>
@@ -108,11 +103,6 @@
         <dependency>
             <groupId>io.agentscope</groupId>
             <artifactId>agentscope-extensions-scheduler-common</artifactId>
-            <version>${agentscope.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.agentscope</groupId>
-            <artifactId>agentscope-extensions-skill-mysql-repository</artifactId>
             <version>${agentscope.version}</version>
         </dependency>
         <dependency>

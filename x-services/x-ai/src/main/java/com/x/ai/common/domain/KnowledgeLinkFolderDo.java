@@ -1,6 +1,5 @@
 package com.x.ai.common.domain;
 
-import com.x.ai.db.enums.AgentKnowledgeLinkScope;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.experimental.Accessors;
@@ -23,9 +22,4 @@ public class KnowledgeLinkFolderDo {
     @Schema(name = "name", description = "文件夹名称")
     private String name;
 
-    @Schema(name = "scope", description = "作用域：1 公共，2 个人")
-    private AgentKnowledgeLinkScope scope;
-
-    @Schema(name = "editable", description = "当前用户是否可以编辑")
-    private boolean editable;
 }

@@ -13,11 +13,6 @@ import com.x.api.contact.dto.UserAuthDto;
 public interface UserService {
 
     /**
-     * 按可信用户 ID 查询基本信息和管理员标志，供内部服务校验权限。
-     */
-    BaseResult<UserDo> getUserById(Long id);
-
-    /**
      * 根据用户id获取用户信息
      *
      * @param mobile 用户手机号

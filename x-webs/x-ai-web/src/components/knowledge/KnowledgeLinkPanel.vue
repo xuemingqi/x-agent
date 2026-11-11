@@ -11,27 +11,19 @@ import {
   TopRight,
 } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 
 import {
   createKnowledgeLink,
   createKnowledgeLinkFolder,
-  createPublicKnowledgeLink,
-  createPublicKnowledgeLinkFolder,
   deleteKnowledgeLink,
   deleteKnowledgeLinkFolder,
-  deletePublicKnowledgeLink,
-  deletePublicKnowledgeLinkFolder,
   listKnowledgeLinkFolders,
   listKnowledgeLinks,
-  listPublicKnowledgeLinkFolders,
-  listPublicKnowledgeLinks,
   renameKnowledgeLinkFolder,
-  renamePublicKnowledgeLinkFolder,
   updateKnowledgeLink,
-  updatePublicKnowledgeLink,
 } from '@/api/knowledge';
-import { KNOWLEDGE_LINK_SCOPE, KNOWLEDGE_ROOT_FOLDER_ID } from '@/types/knowledge';
+import { KNOWLEDGE_ROOT_FOLDER_ID } from '@/types/knowledge';
 import type { KnowledgeLink, KnowledgeLinkFolder, KnowledgeLinkPayload } from '@/types/knowledge';
 import { buildTree, flattenExpandedTree, getTreePath } from '@/utils/tree';
 
@@ -43,7 +35,6 @@ const FOLDER_INDENT_PX = 20;
 const MIN_RESOURCE_CONTENT_WIDTH = 520;
 const MAX_INLINE_FOLDER_DEPTH = 3;
 
-const props = withDefaults(defineProps<{ publicMode?: boolean }>(), { publicMode: false });
 const emit = defineEmits<{ countChange: [count: number] }>();
 const links = ref<KnowledgeLink[]>([]);
 const folders = ref<KnowledgeLinkFolder[]>([]);
@@ -86,20 +77,17 @@ const currentFolderPath = computed(() => formatFolderPath(currentFolderId.value)
 const folderParentPath = computed(() => formatFolderPath(folderForm.parentId));
 const folderOptions = computed(() => [{
   id: KNOWLEDGE_ROOT_FOLDER_ID,
-  name: `${props.publicMode ? '公共' : '个人'}知识库 / 根目录`,
-  children: buildTree(folders.value.filter((folder) => folder.editable), KNOWLEDGE_ROOT_FOLDER_ID),
+  name: '我的知识库 / 根目录',
+  children: buildTree(folders.value, KNOWLEDGE_ROOT_FOLDER_ID),
 }]);
 
 async function loadResources(): Promise<void> {
   if (loading.value) return;
   loading.value = true;
   try {
-    const [loadedLinks, loadedFolders] = await Promise.all(props.publicMode
-      ? [listPublicKnowledgeLinks(), listPublicKnowledgeLinkFolders()]
-      : [listKnowledgeLinks(), listKnowledgeLinkFolders()]);
-    const expectedScope = props.publicMode ? KNOWLEDGE_LINK_SCOPE.PUBLIC : KNOWLEDGE_LINK_SCOPE.USER;
-    links.value = loadedLinks.filter((link) => link.scope === expectedScope);
-    folders.value = loadedFolders.filter((folder) => folder.scope === expectedScope);
+    const [loadedLinks, loadedFolders] = await Promise.all([listKnowledgeLinks(), listKnowledgeLinkFolders()]);
+    links.value = loadedLinks;
+    folders.value = loadedFolders;
     emit('countChange', links.value.length);
     const folderIds = new Set(folders.value.map((folder) => folder.id));
     expandedFolderIds.value = new Set([...expandedFolderIds.value].filter((id) => folderIds.has(id)));
@@ -176,12 +164,12 @@ async function saveLink(): Promise<void> {
   savingLink.value = true;
   try {
     if (editingLinkId.value) {
-      await (props.publicMode ? updatePublicKnowledgeLink : updateKnowledgeLink)(editingLinkId.value, payload);
+      await updateKnowledgeLink(editingLinkId.value, payload);
     } else {
-      await (props.publicMode ? createPublicKnowledgeLink : createKnowledgeLink)(payload);
+      await createKnowledgeLink(payload);
     }
     ElMessage.success(editingLinkId.value ? '在线文档已更新'
-      : `在线文档已添加到${props.publicMode ? '公共' : '个人'}知识库`);
+      : '在线文档已添加到知识库');
     linkDialogVisible.value = false;
     await loadResources();
     revealFolder(payload.folderId);
@@ -197,7 +185,7 @@ async function removeLink(link: KnowledgeLink): Promise<void> {
     await ElMessageBox.confirm(`确定删除在线文档“${link.name}”吗？`, '删除在线文档', {
       confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning',
     });
-    await (props.publicMode ? deletePublicKnowledgeLink : deleteKnowledgeLink)(link.id);
+    await deleteKnowledgeLink(link.id);
     ElMessage.success('在线文档已删除');
     await loadResources();
   } catch (error) {
@@ -208,7 +196,7 @@ async function removeLink(link: KnowledgeLink): Promise<void> {
 }
 
 function startResourceDrag(event: DragEvent, resource: KnowledgeResource): void {
-  if (resource.kind !== 'link' || !resource.link.editable || movingLinkId.value) {
+  if (resource.kind !== 'link' || movingLinkId.value) {
     event.preventDefault();
     return;
   }
@@ -225,9 +213,9 @@ function finishLinkDrag(): void {
   dropTargetFolderId.value = '';
 }
 
-function showLinkDropTarget(event: DragEvent, folderId: string, editable = true): void {
+function showLinkDropTarget(event: DragEvent, folderId: string): void {
   if (!draggingLink.value) return;
-  if (!editable || draggingLink.value.folderId === folderId) {
+  if (draggingLink.value.folderId === folderId) {
     dropTargetFolderId.value = '';
     return;
   }
@@ -238,20 +226,20 @@ function showLinkDropTarget(event: DragEvent, folderId: string, editable = true)
 
 function showResourceDropTarget(event: DragEvent, resource: KnowledgeResource): void {
   if (resource.kind === 'folder') {
-    showLinkDropTarget(event, resource.folder.id, resource.folder.editable);
+    showLinkDropTarget(event, resource.folder.id);
   } else if (draggingLink.value) {
     dropTargetFolderId.value = '';
   }
 }
 
-async function moveDraggedLink(event: DragEvent, folderId: string, editable = true): Promise<void> {
+async function moveDraggedLink(event: DragEvent, folderId: string): Promise<void> {
   const link = draggingLink.value;
-  if (!editable || !link || link.folderId === folderId || movingLinkId.value) return;
+  if (!link || link.folderId === folderId || movingLinkId.value) return;
   event.preventDefault();
   movingLinkId.value = link.id;
   finishLinkDrag();
   try {
-    await (props.publicMode ? updatePublicKnowledgeLink : updateKnowledgeLink)(link.id, {
+    await updateKnowledgeLink(link.id, {
       name: link.name, summary: link.summary, url: link.url, folderId,
     });
     ElMessage.success(`“${link.name}”已移动到${formatFolderPath(folderId)}`);
@@ -265,7 +253,7 @@ async function moveDraggedLink(event: DragEvent, folderId: string, editable = tr
 }
 
 function moveDraggedResource(event: DragEvent, resource: KnowledgeResource): void {
-  if (resource.kind === 'folder') void moveDraggedLink(event, resource.folder.id, resource.folder.editable);
+  if (resource.kind === 'folder') void moveDraggedLink(event, resource.folder.id);
 }
 
 function openCreateFolder(parentId: string): void {
@@ -292,10 +280,9 @@ async function saveFolder(): Promise<void> {
   let createdFolderId = '';
   try {
     if (editingFolderId.value) {
-      await (props.publicMode ? renamePublicKnowledgeLinkFolder : renameKnowledgeLinkFolder)(editingFolderId.value, name);
+      await renameKnowledgeLinkFolder(editingFolderId.value, name);
     } else {
-      const createFolder = props.publicMode ? createPublicKnowledgeLinkFolder : createKnowledgeLinkFolder;
-      const createdFolder = await createFolder({ name, parentId: folderForm.parentId });
+      const createdFolder = await createKnowledgeLinkFolder({ name, parentId: folderForm.parentId });
       createdFolderId = createdFolder.id;
     }
     ElMessage.success(editingFolderId.value ? '文件夹已重命名' : '文件夹已创建');
@@ -314,7 +301,7 @@ async function removeFolder(folder: KnowledgeLinkFolder): Promise<void> {
     await ElMessageBox.confirm(`确定删除文件夹“${folder.name}”吗？仅允许删除空文件夹，不会连带删除文档。`, '删除文件夹', {
       confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning',
     });
-    await (props.publicMode ? deletePublicKnowledgeLinkFolder : deleteKnowledgeLinkFolder)(folder.id);
+    await deleteKnowledgeLinkFolder(folder.id);
     ElMessage.success('文件夹已删除');
     await loadResources();
   } catch (error) {
@@ -333,7 +320,7 @@ function formatTime(value: string): string {
 }
 
 function formatFolderPath(id: string): string {
-  const rootName = props.publicMode ? '公共知识库' : '个人知识库';
+  const rootName = '我的知识库';
   if (id === KNOWLEDGE_ROOT_FOLDER_ID) return `${rootName} / 根目录`;
   const path = getTreePath(folders.value, id, KNOWLEDGE_ROOT_FOLDER_ID);
   return [rootName, ...path.map((folder) => folder.name)].join(' / ');
@@ -348,16 +335,12 @@ onMounted(() => {
   if (resourceList.value) resizeObserver.observe(resourceList.value);
 });
 onBeforeUnmount(() => resizeObserver?.disconnect());
-watch(() => props.publicMode, () => {
-  focusFolder(KNOWLEDGE_ROOT_FOLDER_ID);
-  void loadResources();
-});
 </script>
 
 <template>
   <div class="knowledge-link-panel">
     <div class="resource-toolbar">
-      <div><strong>{{ links.length }}</strong><span>个{{ publicMode ? '公共' : '个人' }}文档</span></div>
+      <div><strong>{{ links.length }}</strong><span>个文档</span></div>
       <p>按文件夹浏览，拖动文档调整归属</p>
       <el-button title="在根目录新建文件夹" :disabled="loading" @click="openCreateFolder(KNOWLEDGE_ROOT_FOLDER_ID)">
         <el-icon><FolderAdd /></el-icon>新建根文件夹
@@ -376,7 +359,7 @@ watch(() => props.publicMode, () => {
         @dragover.prevent="showLinkDropTarget($event, KNOWLEDGE_ROOT_FOLDER_ID)"
         @drop.prevent.stop="moveDraggedLink($event, KNOWLEDGE_ROOT_FOLDER_ID)"
       >
-        {{ publicMode ? '公共知识库' : '个人知识库' }} / 根目录
+        我的知识库 / 根目录
       </button>
       <template v-if="hiddenBreadcrumbs.length">
         <span aria-hidden="true">/</span>
@@ -396,9 +379,9 @@ watch(() => props.publicMode, () => {
           :title="draggingLink ? `将文档移动到${folder.name}` : folder.name"
           :aria-current="currentFolderId === folder.id ? 'page' : undefined"
           @click="focusFolder(folder.id)"
-          @dragenter="showLinkDropTarget($event, folder.id, folder.editable)"
-          @dragover="showLinkDropTarget($event, folder.id, folder.editable)"
-          @drop="moveDraggedLink($event, folder.id, folder.editable)"
+          @dragenter="showLinkDropTarget($event, folder.id)"
+          @dragover="showLinkDropTarget($event, folder.id)"
+          @drop="moveDraggedLink($event, folder.id)"
         >{{ folder.name }}</button>
       </template>
       <span class="knowledge-folder-count" :title="currentFolderPath">当前目录：{{ currentFolderPath }}</span>
@@ -406,17 +389,17 @@ watch(() => props.publicMode, () => {
 
     <div ref="resourceList" v-loading="loading" class="resource-list knowledge-resource-list">
       <div class="knowledge-list-heading" aria-hidden="true"><span>名称 / 简介</span><span>操作</span></div>
-      <ul :aria-label="`${publicMode ? '公共' : '个人'}在线文档`">
+      <ul aria-label="在线文档">
         <li
           v-for="row in visibleRows" :key="row.node.id" class="resource-row knowledge-resource-row"
           :class="{
             'selected-folder': row.node.kind === 'folder' && row.node.id === selectedFolderId,
             'folder-drop-target': row.node.kind === 'folder' && row.node.id === dropTargetFolderId,
-            'draggable-link': row.node.kind === 'link' && row.node.link.editable,
+            'draggable-link': row.node.kind === 'link',
             'dragging-link': row.node.kind === 'link' && row.node.link.id === draggingLink?.id,
             'moving-link': row.node.kind === 'link' && row.node.link.id === movingLinkId,
           }"
-          :draggable="row.node.kind === 'link' && row.node.link.editable && !movingLinkId"
+          :draggable="row.node.kind === 'link' && !movingLinkId"
           :style="{ '--resource-indent': `${row.depth * FOLDER_INDENT_PX}px` }"
           @dragstart="startResourceDrag($event, row.node)"
           @dragend="finishLinkDrag"
@@ -436,7 +419,7 @@ watch(() => props.publicMode, () => {
               <span class="resource-main"><strong :title="row.node.folder.name">{{ row.node.folder.name }}</strong></span>
               <span class="folder-detail">{{ row.depth >= maxInlineDepth ? '面包屑浏览' : row.node.children.length ? `${row.node.children.length} 项` : '空文件夹' }}</span>
             </button>
-            <div v-if="row.node.folder.editable" class="resource-actions">
+            <div class="resource-actions">
               <el-button text title="新建子文件夹" :disabled="loading" @click="openCreateFolder(row.node.id)"><el-icon><FolderAdd /></el-icon></el-button>
               <el-button text title="重命名文件夹" @click="openRenameFolder(row.node.folder)"><el-icon><EditPen /></el-icon></el-button>
               <el-button text title="删除空文件夹" class="danger-action" @click="removeFolder(row.node.folder)"><el-icon><Delete /></el-icon></el-button>
@@ -453,8 +436,8 @@ watch(() => props.publicMode, () => {
             <div class="resource-meta"><span>更新于</span><span>{{ formatTime(row.node.link.updateTime) }}</span></div>
             <div class="resource-actions">
               <el-button text title="打开链接" @click="openLink(row.node.link)"><el-icon><TopRight /></el-icon></el-button>
-              <el-button v-if="row.node.link.editable" text title="编辑或移动文档" @click="openEditLink(row.node.link)"><el-icon><EditPen /></el-icon></el-button>
-              <el-button v-if="row.node.link.editable" text title="删除" class="danger-action" @click="removeLink(row.node.link)"><el-icon><Delete /></el-icon></el-button>
+              <el-button text title="编辑或移动文档" @click="openEditLink(row.node.link)"><el-icon><EditPen /></el-icon></el-button>
+              <el-button text title="删除" class="danger-action" @click="removeLink(row.node.link)"><el-icon><Delete /></el-icon></el-button>
             </div>
           </template>
         </li>
@@ -478,7 +461,7 @@ watch(() => props.publicMode, () => {
         <div class="content-dialog-heading">
           <div class="content-dialog-heading-icon knowledge"><el-icon><Link /></el-icon></div>
           <div>
-            <span>{{ publicMode ? '公共知识库' : '个人知识库' }}</span>
+            <span>我的知识库</span>
             <strong>{{ editingLinkId ? '编辑在线文档' : '添加在线文档' }}</strong>
             <p>将可信文档链接加入知识库，Agent 会按场景读取内容。</p>
           </div>
@@ -548,7 +531,7 @@ watch(() => props.publicMode, () => {
 
       <template #footer>
         <div class="content-dialog-footer">
-          <span>{{ publicMode ? '所有用户的 Agent 都可以使用这份文档。' : '仅你的 Agent 可以使用这份文档。' }}</span>
+          <span>仅你的 Agent 可以使用这份文档。</span>
           <div>
             <el-button @click="linkDialogVisible = false">取消</el-button>
             <el-button type="primary" :loading="savingLink" @click="saveLink">

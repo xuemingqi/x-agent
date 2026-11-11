@@ -5,21 +5,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp, defineComponent, h, nextTick } from 'vue';
 
 import {
-  listKnowledgeDocuments, listPublicKnowledgeDocuments, reindexKnowledgeDocument,
+  listKnowledgeDocuments, reindexKnowledgeDocument,
   searchKnowledgeDocuments, uploadKnowledgeDocuments,
 } from '@/api/knowledge';
 import type { KnowledgeDocument } from '@/types/knowledge';
 import KnowledgeView from './KnowledgeView.vue';
 
 vi.mock('@/api/knowledge', () => ({
-  listKnowledgeDocuments: vi.fn(), listPublicKnowledgeDocuments: vi.fn(),
-  uploadKnowledgeDocuments: vi.fn(), uploadPublicKnowledgeDocuments: vi.fn(),
-  deleteKnowledgeDocument: vi.fn(), deletePublicKnowledgeDocument: vi.fn(),
-  downloadKnowledgeDocument: vi.fn(), downloadPublicKnowledgeDocument: vi.fn(),
+  listKnowledgeDocuments: vi.fn(),
+  uploadKnowledgeDocuments: vi.fn(),
+  deleteKnowledgeDocument: vi.fn(),
+  downloadKnowledgeDocument: vi.fn(),
   reindexKnowledgeDocument: vi.fn(), searchKnowledgeDocuments: vi.fn(),
-}));
-vi.mock('@/api/administration', () => ({
-  getAdministrationStatus: vi.fn().mockResolvedValue({ administrator: true, role: 'ADMIN' }),
 }));
 vi.mock('@/components/knowledge/KnowledgeLinkPanel.vue', () => ({ default: { template: '<div />' } }));
 vi.mock('@/components/knowledge/KnowledgeDocumentReader.vue', () => ({
@@ -47,7 +44,6 @@ const document: KnowledgeDocument = {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(listKnowledgeDocuments).mockResolvedValue([document]);
-  vi.mocked(listPublicKnowledgeDocuments).mockResolvedValue([{ ...document, name: 'public.txt', path: 'public.txt' }]);
 });
 afterEach(() => cleanups.splice(0).forEach((cleanup) => cleanup()));
 
@@ -75,26 +71,15 @@ async function mount() {
   return container;
 }
 
-function switchToPublic(container: HTMLElement): void {
-  [...container.querySelectorAll('.scope-switch button')]
-    .find((button) => button.textContent?.includes('公共知识库'))!
-    .dispatchEvent(new MouseEvent('click', { bubbles: true }));
-}
-
 describe('RAG knowledge management', () => {
-  it('keeps public files visible when an older private listing finishes later', async () => {
-    let finish!: (value: KnowledgeDocument[]) => void;
-    vi.mocked(listKnowledgeDocuments).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+  it('shows only the user document collection without role or scope controls', async () => {
     const container = await mount();
-    switchToPublic(container);
-    await vi.waitFor(() => expect(container.querySelector('.document-summary > strong')?.textContent).toBe('public.txt'));
-    finish([document]);
-    await nextTick();
-    await nextTick();
-    expect(container.querySelector('.document-summary > strong')?.textContent).toBe('public.txt');
+    expect(listKnowledgeDocuments).toHaveBeenCalledWith();
+    expect(container.querySelector('.scope-switch')).toBeNull();
+    expect(container.querySelector('.document-summary > strong')?.textContent).toBe('guide.txt');
   });
 
-  it('discards semantic search results after switching knowledge scopes', async () => {
+  it('discards an obsolete search after the query is cleared', async () => {
     let finish!: (value: Awaited<ReturnType<typeof searchKnowledgeDocuments>>) => void;
     vi.mocked(searchKnowledgeDocuments).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
     const container = await mount();
@@ -103,12 +88,13 @@ describe('RAG knowledge management', () => {
     query.dispatchEvent(new Event('input', { bubbles: true }));
     await nextTick();
     container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    expect(searchKnowledgeDocuments).toHaveBeenCalledWith('订单退款', 'user');
-    switchToPublic(container);
-    finish([{ path: document.path, name: 'private-result.txt', chunkIndex: 0, content: '个人文档', score: 0.9, scope: 'user' }]);
+    expect(searchKnowledgeDocuments).toHaveBeenCalledWith('订单退款');
+    await nextTick();
+    container.querySelector<HTMLButtonElement>('.catalog-text-action')!.click();
+    finish([{ path: document.path, name: 'obsolete-result.txt', chunkIndex: 0, content: '文档', score: 0.9 }]);
     await nextTick();
     await nextTick();
-    expect(container.textContent).not.toContain('private-result.txt');
+    expect(container.textContent).not.toContain('obsolete-result.txt');
     expect(container.querySelector('.search-results')).toBeNull();
   });
 
@@ -129,7 +115,7 @@ describe('RAG knowledge management', () => {
     await nextTick();
     container.querySelector<HTMLButtonElement>('[title="重新索引"]')!.click();
     await vi.waitFor(() => expect(container.querySelector('.index-status')?.textContent).toBe('已索引'));
-    expect(reindexKnowledgeDocument).toHaveBeenCalledWith('guide.txt', 'user');
+    expect(reindexKnowledgeDocument).toHaveBeenCalledWith('guide.txt');
     expect(container.textContent).not.toContain('Ollama 连接失败');
   });
 
@@ -144,7 +130,7 @@ describe('RAG knowledge management', () => {
     vi.mocked(listKnowledgeDocuments).mockResolvedValue([document]);
     retry.click();
     await vi.waitFor(() => expect(container.querySelector('.index-status')?.textContent).toBe('已索引'));
-    expect(reindexKnowledgeDocument).toHaveBeenCalledWith('guide.txt', 'user');
+    expect(reindexKnowledgeDocument).toHaveBeenCalledWith('guide.txt');
   });
 
   it('keeps document reading in the page and returns to the catalog without an overlay', async () => {
@@ -163,7 +149,7 @@ describe('RAG knowledge management', () => {
 
   it('opens a semantic hit in the reader on its matching chunk page', async () => {
     vi.mocked(searchKnowledgeDocuments).mockResolvedValue([{
-      path: document.path, name: document.name, chunkIndex: 23, content: '退款需要提供订单号', score: 0.9, scope: 'user',
+      path: document.path, name: document.name, chunkIndex: 23, content: '退款需要提供订单号', score: 0.9,
     }]);
     const container = await mount();
     const query = container.querySelector<HTMLInputElement>('.search-form input')!;

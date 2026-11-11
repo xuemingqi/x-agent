@@ -21,7 +21,7 @@ public class KnowledgeLinkManagementTools {
     @Tool(name = "knowledge_link_list", readOnly = true, description = """
             查询当前用户的个人在线知识库链接完整配置，供新增、编辑、删除或移动时定位链接。
             返回 id、folderId、名称、简短介绍和 URL；所有 ID 均为字符串，folderId 为 "0" 表示根目录。
-            不返回公共链接、不读取文档正文。名称有歧义时应先明确要操作的链接。
+            不读取文档正文。名称有歧义时应先明确要操作的链接。
             """)
     public List<KnowledgeLinkToolDto> list(ToolContext context) {
         return knowledgeLinkManagementToolService.list(context);
@@ -56,7 +56,7 @@ public class KnowledgeLinkManagementTools {
 
     @Tool(name = "knowledge_link_delete", description = """
             删除用户明确指定的个人在线知识库链接记录，不删除链接指向的原始文档。
-            应先使用 knowledge_link_list 定位，id 必须是个人链接 ID 字符串，不能操作公共或其他用户的链接。
+            应先使用 knowledge_link_list 定位，id 必须是个人链接 ID 字符串，不能操作其他用户的链接。
             """)
     public boolean delete(@ToolParam(name = "id", description = "用户要删除的个人链接 ID 字符串") String id,
                           ToolContext context) {
@@ -66,7 +66,7 @@ public class KnowledgeLinkManagementTools {
     @Tool(name = "knowledge_link_move", description = """
             将当前用户的个人在线知识库链接移入指定个人文件夹，保留名称、介绍和 URL。
             id 和 folderId 都必须是字符串；folderId 传 "0" 表示根目录。
-            先用 knowledge_link_list 和 knowledge_link_folder_list 定位，不允许跨用户或移入公共目录。
+            先用 knowledge_link_list 和 knowledge_link_folder_list 定位，不允许跨用户操作。
             """)
     public KnowledgeLinkToolDto move(@ToolParam(name = "id", description = "待移动的个人链接 ID 字符串") String id,
             @ToolParam(name = "folderId", description = "目标个人文件夹 ID 字符串；字符串 0 表示根目录") String folderId,
@@ -116,7 +116,7 @@ public class KnowledgeLinkManagementTools {
     @Tool(name = "knowledge_link_folder_move", description = """
             移动当前用户的个人在线知识库文件夹，子文件夹和链接随父目录保留，文件夹名称不变。
             id 和 parentId 均为字符串，parentId 为 "0" 表示根目录；不可移动根目录。
-            不允许移入自身、后代、公共或其他用户目录；目标目录不能存在同名文件夹。
+            不允许移入自身、后代或其他用户目录；目标目录不能存在同名文件夹。
             """)
     public KnowledgeLinkFolderToolDto moveFolder(@ToolParam(name = "id", description = "待移动的个人文件夹 ID 字符串") String id,
             @ToolParam(name = "parentId", description = "目标父文件夹 ID 字符串；字符串 0 表示根目录") String parentId,

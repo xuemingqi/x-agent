@@ -63,7 +63,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
     @Override
     public List<KnowledgeSearchResultDo> search(String query, int limit) {
-        return ragKnowledgeService.search(UserThreadLocalUtil.getUserId(), query, limit, false);
+        return ragKnowledgeService.search(UserThreadLocalUtil.getUserId(), query, limit);
     }
 
 }

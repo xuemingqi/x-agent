@@ -1,17 +1,13 @@
 package com.x.ai.service.impl;
 
-import com.x.ai.common.model.ResourceEnablement;
-import com.x.ai.mcp.api.McpRuntimeApi;
-import com.x.ai.mcp.api.domain.McpConnectionTestDo;
-import com.x.ai.mcp.api.domain.McpServerDo;
-import com.x.ai.mcp.api.dto.McpServerCreateDto;
-import com.x.ai.mcp.api.dto.McpServerUpdateDto;
-import com.x.ai.mcp.api.dto.McpUserCredentialUpdateDto;
-import com.x.ai.mcp.api.enums.McpScope;
+import com.x.ai.common.domain.McpConnectionTestDo;
+import com.x.ai.common.domain.McpServerDo;
+import com.x.ai.common.dto.McpServerCreateDto;
+import com.x.ai.common.dto.McpServerUpdateDto;
 import com.x.ai.service.HarnessAgentService;
 import com.x.ai.service.McpConnectionService;
+import com.x.ai.service.McpServerManagementService;
 import com.x.ai.service.McpServerService;
-import com.x.ai.service.ResourceEnablementService;
 import com.x.framework.common.utils.UserThreadLocalUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,42 +18,34 @@ import java.util.List;
 @RequiredArgsConstructor
 public class McpServerServiceImpl implements McpServerService {
 
-    private final McpRuntimeApi mcpRuntimeApi;
+    private final McpServerManagementService mcpServerManagementService;
 
     private final HarnessAgentService harnessAgentService;
 
     private final McpConnectionService mcpConnectionService;
 
-    private final ResourceEnablementService resourceEnablementService;
-
     @Override
-    public List<McpServerDo> list(McpScope scope) {
-        String userId = currentUserId();
-        ResourceEnablement enablement = resourceEnablementService.get(userId);
-        List<McpServerDo> servers = mcpRuntimeApi.list(userId, scope == null ? null : scope.getCode());
-        servers.forEach(server -> server.setUserEnabled(enablement.isMcpEnabled(server.getId())));
-        return servers;
+    public List<McpServerDo> list() {
+        return mcpServerManagementService.list(currentUserId());
     }
 
     @Override
-    public boolean setEnabled(McpScope scope, Long id, boolean enabled) {
+    public boolean setEnabled(Long id, boolean enabled) {
         String userId = currentUserId();
-        mcpRuntimeApi.get(userId, scope.getCode(), id);
-        resourceEnablementService.setEnabled(userId, ResourceEnablement.mcpKey(id), enabled);
+        mcpServerManagementService.setEnabled(userId, id, enabled);
+        harnessAgentService.evictUserAgents(userId);
         return enabled;
     }
 
     @Override
-    public McpServerDo get(McpScope scope, Long id) {
-        String userId = currentUserId();
-        return mcpRuntimeApi.get(userId, scope.getCode(), id)
-                .setUserEnabled(resourceEnablementService.get(userId).isMcpEnabled(id));
+    public McpServerDo get(Long id) {
+        return mcpServerManagementService.get(currentUserId(), id);
     }
 
     @Override
     public McpServerDo create(McpServerCreateDto request) {
         String userId = currentUserId();
-        McpServerDo server = mcpRuntimeApi.create(userId, request);
+        McpServerDo server = mcpServerManagementService.create(userId, request);
         harnessAgentService.evictUserAgents(userId);
         return server;
     }
@@ -65,17 +53,7 @@ public class McpServerServiceImpl implements McpServerService {
     @Override
     public McpServerDo update(Long id, McpServerUpdateDto request) {
         String userId = currentUserId();
-        McpServerDo server = mcpRuntimeApi.update(userId, id, request)
-                .setUserEnabled(resourceEnablementService.get(userId).isMcpEnabled(id));
-        harnessAgentService.evictUserAgents(userId);
-        return server;
-    }
-
-    @Override
-    public McpServerDo updateUserCredential(Long id, McpUserCredentialUpdateDto request) {
-        String userId = currentUserId();
-        McpServerDo server = mcpRuntimeApi.updateUserCredential(userId, id, request)
-                .setUserEnabled(resourceEnablementService.get(userId).isMcpEnabled(id));
+        McpServerDo server = mcpServerManagementService.update(userId, id, request);
         harnessAgentService.evictUserAgents(userId);
         return server;
     }
@@ -83,7 +61,7 @@ public class McpServerServiceImpl implements McpServerService {
     @Override
     public boolean delete(Long id) {
         String userId = currentUserId();
-        boolean deleted = mcpRuntimeApi.delete(userId, id);
+        boolean deleted = mcpServerManagementService.delete(userId, id);
         if (deleted) {
             harnessAgentService.evictUserAgents(userId);
         }
@@ -91,8 +69,8 @@ public class McpServerServiceImpl implements McpServerService {
     }
 
     @Override
-    public McpConnectionTestDo testConnection(McpScope scope, Long id) {
-        var result = mcpConnectionService.testConnection(currentUserId(), scope, id);
+    public McpConnectionTestDo testConnection(Long id) {
+        var result = mcpConnectionService.testConnection(currentUserId(), id);
         return new McpConnectionTestDo().setConnected(result.isConnected()).setToolNames(result.getToolNames());
     }
 

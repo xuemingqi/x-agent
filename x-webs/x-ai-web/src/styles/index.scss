@@ -2364,7 +2364,6 @@ h1, h2, h3, h4, strong {
 .resource-list,
 .knowledge-tabs,
 .extension-tabs,
-.scope-switch,
 .skill-grid,
 .mcp-placeholder {
   width: min(var(--workspace-max-width), 100%);
@@ -2567,8 +2566,7 @@ h1, h2, h3, h4, strong {
   background: var(--panel-bg);
 }
 
-.extension-tabs button,
-.scope-switch button {
+.extension-tabs button {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2581,17 +2579,7 @@ h1, h2, h3, h4, strong {
   transition: color 150ms var(--ease), background-color 150ms var(--ease), border-color 150ms var(--ease);
 }
 
-.notification-dot {
-  width: 7px;
-  height: 7px;
-  margin-left: -4px;
-  border-radius: 50%;
-  background: var(--danger);
-  box-shadow: 0 0 0 3px var(--danger-soft);
-}
-
-.extension-tabs button.active,
-.scope-switch button.active {
+.extension-tabs button.active {
   color: var(--text);
   background: var(--surface-hover);
 }
@@ -2605,101 +2593,11 @@ h1, h2, h3, h4, strong {
   font-size: 11px;
 }
 
-.scope-switch {
-  display: flex;
-  gap: 20px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid var(--line);
-}
-
-.scope-switch button {
-  position: relative;
-  border-radius: 8px 8px 0 0;
-}
-
-.scope-switch button.active::after {
-  position: absolute;
-  right: 12px;
-  bottom: -1px;
-  left: 12px;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--primary-bright);
-  content: "";
-}
-
 .skill-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   min-height: 280px;
-}
-
-.skill-share-inbox {
-  margin-bottom: 16px;
-  padding: 16px;
-  border: 1px solid var(--danger-border);
-  border-radius: 16px;
-  background: var(--danger-soft);
-}
-
-.skill-share-inbox-title,
-.skill-share-card,
-.skill-share-actions {
-  display: flex;
-  align-items: center;
-}
-
-.skill-share-inbox-title {
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.skill-share-inbox-title span {
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.skill-share-inbox-title p {
-  margin: 4px 0 0;
-  color: var(--text-muted);
-  font-size: 11px;
-}
-
-.skill-share-list {
-  display: grid;
-  gap: 8px;
-}
-
-.skill-share-card {
-  justify-content: space-between;
-  gap: 20px;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--list-bg);
-}
-
-.skill-share-card h3 {
-  margin: 4px 0;
-  font-size: 15px;
-}
-
-.skill-share-card span,
-.skill-share-card small {
-  color: var(--text-muted);
-  font-size: 11px;
-}
-
-.skill-share-card p {
-  margin: 8px 0;
-  color: var(--text-soft);
-  font-size: 12px;
-}
-
-.skill-share-actions {
-  flex-shrink: 0;
 }
 
 .skill-grid > .el-empty {
@@ -2781,12 +2679,6 @@ h1, h2, h3, h4, strong {
 
 .skill-resources {
   margin-bottom: 8px;
-}
-
-.skill-shared-by {
-  margin: -8px 0 12px;
-  color: var(--text-muted);
-  font-size: 11px;
 }
 
 .skill-actions {
@@ -2962,17 +2854,6 @@ h1, h2, h3, h4, strong {
   grid-template-columns: minmax(150px, 0.75fr) minmax(220px, 1.25fr) auto;
   gap: 8px;
   margin-top: 8px;
-}
-
-.mcp-stdio-warning {
-  margin-bottom: 16px;
-  padding: 12px 12px;
-  border: 1px solid var(--warning-border);
-  border-radius: 10px;
-  color: var(--warning-text);
-  background: var(--warning-soft);
-  font-size: 11px;
-  line-height: 1.6;
 }
 
 .mcp-timeout-grid .el-input-number {

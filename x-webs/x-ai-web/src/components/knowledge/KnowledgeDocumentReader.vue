@@ -4,17 +4,15 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 
 import {
   downloadKnowledgeDocument,
-  downloadPublicKnowledgeDocument,
   getKnowledgeDocumentPreview,
   listKnowledgeDocumentChunks,
 } from '@/api/knowledge';
 import KnowledgeChunkCard from '@/components/knowledge/KnowledgeChunkCard.vue';
-import type { KnowledgeChunkPage, KnowledgeDocument, KnowledgeScope } from '@/types/knowledge';
+import type { KnowledgeChunkPage, KnowledgeDocument } from '@/types/knowledge';
 import { renderMarkdown } from '@/utils/markdown';
 
 const props = defineProps<{
   document: KnowledgeDocument;
-  scope: KnowledgeScope;
   initialTab: 'preview' | 'chunks';
   initialChunkIndex?: number;
   reindexing?: boolean;
@@ -41,14 +39,14 @@ const isPdf = computed(() => props.document.name.toLowerCase().endsWith('.pdf'))
 const isMarkdown = computed(() => /\.(md|markdown)$/i.test(props.document.name));
 const renderedContent = computed(() => isMarkdown.value ? renderMarkdown(content.value) : '');
 
-watch([() => props.document, () => props.scope, previewRevision], async (_, __, onCleanup) => {
+watch([() => props.document, previewRevision], async (_, __, onCleanup) => {
   let disposed = false;
   onCleanup(() => { disposed = true; });
   content.value = '';
   previewError.value = '';
   loadingPreview.value = true;
   try {
-    const preview = await getKnowledgeDocumentPreview(props.document.path, props.scope);
+    const preview = await getKnowledgeDocumentPreview(props.document.path);
     if (!disposed) content.value = preview.content;
   } catch (error) {
     if (!disposed) previewError.value = error instanceof Error ? error.message : '正文加载失败';
@@ -57,7 +55,7 @@ watch([() => props.document, () => props.scope, previewRevision], async (_, __, 
   }
 }, { immediate: true });
 
-watch([() => props.document, () => props.scope, activeTab, page, chunksRevision], async (_, __, onCleanup) => {
+watch([() => props.document, activeTab, page, chunksRevision], async (_, __, onCleanup) => {
   let disposed = false;
   onCleanup(() => { disposed = true; });
   if (activeTab.value !== 'chunks') return;
@@ -65,7 +63,7 @@ watch([() => props.document, () => props.scope, activeTab, page, chunksRevision]
   chunksError.value = '';
   loadingChunks.value = true;
   try {
-    const result = await listKnowledgeDocumentChunks(props.document.path, props.scope, page.value, pageSize);
+    const result = await listKnowledgeDocumentChunks(props.document.path, page.value, pageSize);
     if (!disposed) {
       chunks.value = result;
       await nextTick();
@@ -78,7 +76,7 @@ watch([() => props.document, () => props.scope, activeTab, page, chunksRevision]
   }
 }, { immediate: true });
 
-watch([() => props.document, () => props.scope, showOriginal], async (_, __, onCleanup) => {
+watch([() => props.document, showOriginal], async (_, __, onCleanup) => {
   let disposed = false;
   let objectUrl = '';
   originalUrl.value = '';
@@ -91,9 +89,7 @@ watch([() => props.document, () => props.scope, showOriginal], async (_, __, onC
   if (!showOriginal.value || !isPdf.value) return;
   loadingOriginal.value = true;
   try {
-    const blob = await (props.scope === 'public'
-      ? downloadPublicKnowledgeDocument(props.document.path)
-      : downloadKnowledgeDocument(props.document.path));
+    const blob = await downloadKnowledgeDocument(props.document.path);
     if (disposed) return;
     objectUrl = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
     originalUrl.value = objectUrl;
@@ -123,7 +119,7 @@ onMounted(() => readerPanel.value?.focus({ preventScroll: true }));
         <button type="button" class="reader-back" title="返回文档列表" aria-label="返回文档列表" @click="emit('close')">
           <el-icon><ArrowLeft /></el-icon><span>文档列表</span>
         </button>
-        <div class="reader-title"><h2 :title="document.name">{{ document.name }}</h2><span>{{ scope === 'public' ? '公共知识库' : '个人知识库' }} · {{ formattedSize(document.size) }}</span></div>
+        <div class="reader-title"><h2 :title="document.name">{{ document.name }}</h2><span>我的知识库 · {{ formattedSize(document.size) }}</span></div>
       </div>
       <div class="reader-actions" aria-label="文档操作">
         <el-button text title="下载" :aria-label="`下载 ${document.name}`" @click="emit('download')"><el-icon><Download /></el-icon><span>下载</span></el-button>
