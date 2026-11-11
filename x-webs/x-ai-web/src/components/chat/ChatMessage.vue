@@ -3,6 +3,7 @@ import { computed } from 'vue';
 
 import BrowserScreenshotCard from '@/components/chat/BrowserScreenshotCard.vue';
 import ChatReasoning from '@/components/chat/ChatReasoning.vue';
+import ChatTokenUsage from '@/components/chat/ChatTokenUsage.vue';
 import FileDownloadCard from '@/components/file/FileDownloadCard.vue';
 import type { DisplayMessage } from '@/stores/chat';
 import type { ConversationFile } from '@/types/chat';
@@ -77,6 +78,7 @@ const responseSections = computed(() => {
           @preview="emit('preview', $event)"
         />
       </div>
+      <ChatTokenUsage v-if="message.role === 'ASSISTANT' && message.usage" :usage="message.usage" />
     </div>
   </article>
 </template>

@@ -13,6 +13,7 @@ import com.x.ai.common.model.FileToolContext;
 import com.x.ai.common.model.Registration;
 import com.x.ai.common.model.PreparedAgentExecution;
 import com.x.ai.common.model.ToolContext;
+import com.x.ai.common.model.TokenUsageAccumulator;
 import com.x.ai.common.model.UserContext;
 import com.x.ai.common.model.AiModelRuntimeConfig;
 import com.x.ai.db.enums.ConversationMessageRole;
@@ -34,6 +35,7 @@ import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.event.AgentResultEvent;
 import io.agentscope.core.event.AgentStartEvent;
 import io.agentscope.core.event.CustomEvent;
+import io.agentscope.core.event.ModelCallEndEvent;
 import io.agentscope.core.event.TextBlockDeltaEvent;
 import io.agentscope.core.event.ThinkingBlockDeltaEvent;
 import io.agentscope.core.event.ToolCallEndEvent;
@@ -81,6 +83,8 @@ public class AgentExecutionServiceImpl implements AgentExecutionService {
 
     private static final String DATA_STATE = "state";
 
+    private static final String DATA_USAGE = "usage";
+
     private final HarnessAgentService harnessAgentService;
 
     private final AiModelRuntimeService aiModelRuntimeService;
@@ -104,12 +108,14 @@ public class AgentExecutionServiceImpl implements AgentExecutionService {
     public AgentResponseDo run(UserContext userContext, AgentRequestDto request) {
         PreparedAgentExecution execution = prepareConversationExecution(userContext, request, IdUtil.fastUUID());
         AgentResponseDo response = executeBlocking(execution, request);
-        if (!StringUtil.isBlank(response.getText()) || response.getStructuredData().containsKey(DATA_FILES)) {
-            RuntimeContext context = execution.getContext();
+        RuntimeContext context = execution.getContext();
+        if (!StringUtil.isBlank(response.getText()) || response.getStructuredData().containsKey(DATA_FILES)
+                || context.get(TokenUsageAccumulator.class).snapshot().getModelCalls() > 0) {
             conversationService.appendMessages(context.getUserId(), context.getSessionId(), execution.getMessageId(),
                     List.of(new ConversationMessageDo()
                             .setRole(ConversationMessageRole.ASSISTANT)
-                            .setContent(response.getText())));
+                            .setContent(response.getText())
+                            .setUsage(context.get(TokenUsageAccumulator.class).snapshot())));
         }
         return response;
     }
@@ -133,6 +139,7 @@ public class AgentExecutionServiceImpl implements AgentExecutionService {
                 ? null : result.getGenerateReason().name();
         Map<String, Object> data = new LinkedHashMap<>();
         data.put(DATA_TEXT, text);
+        data.put(DATA_USAGE, context.get(TokenUsageAccumulator.class).snapshot());
         if (generateReason != null) {
             data.put(DATA_GENERATE_REASON, generateReason);
         }
@@ -266,6 +273,12 @@ public class AgentExecutionServiceImpl implements AgentExecutionService {
                     addPublishedFiles(data, context, userMessageId, emittedFileIds);
                 }
             }
+            case ModelCallEndEvent end -> {
+                type = AgentEventType.TOKEN_USAGE;
+                TokenUsageAccumulator usage = context.get(TokenUsageAccumulator.class);
+                usage.record(end);
+                data.put(DATA_USAGE, usage.snapshot());
+            }
             case AgentEndEvent ignored -> type = AgentEventType.AGENT_END;
             default -> type = AgentEventType.UNKNOWN;
         }
@@ -344,6 +357,7 @@ public class AgentExecutionServiceImpl implements AgentExecutionService {
                 .sessionId(request.getSessionId())
                 .put(ToolContext.class, toolContext)
                 .put(FileToolContext.class, fileToolContext)
+                .put(TokenUsageAccumulator.class, new TokenUsageAccumulator())
                 .build();
     }
 

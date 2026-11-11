@@ -35,7 +35,8 @@ scripts                  配置导入、SQL 与初始管理员工具
 - JDK 21、Maven 3.9+
 - Node.js 22.22.2+（22.x LTS）、npm（仅前端构建需要）
 - Nacos 2.x（本项目验证版本为 2.4.2）
-- MySQL 8、Redis、MinIO
+- MySQL 8、Redis、MinIO、PostgreSQL 13+ 与 pgvector
+- Ollama 及可用的 embedding 模型，模型名称与维度通过 Nacos 配置
 - Docker CLI 和可连接的 Docker daemon（Agent 沙箱）
 - Python 3（配置和初始化辅助脚本，无第三方 Python 依赖）
 
@@ -109,6 +110,52 @@ rm /tmp/x-agent-admin.sql
 
 可选的演示 Skill 种子位于 `x-services/x-ai/src/main/resources/db/skill-seed.sql`。改动实体结构后，可运行 `python3 scripts/build-init-sql.py` 重新汇总初始化包。
 
+### RAG 知识库
+
+知识库原文件、提取正文和向量切片统一保存到独立 PostgreSQL，不再挂载共享知识目录。
+所有知识库业务配置集中在 Nacos 的 `x-ai.yaml` / `knowledge` 节点，本地 `application.yml` 仅保留 Nacos 引导配置。
+公开模板使用环境变量占位符；在私有 `.env` 配置 `KNOWLEDGE_VECTOR_JDBC_URL`、`KNOWLEDGE_VECTOR_USERNAME`、
+`KNOWLEDGE_VECTOR_PASSWORD`、`KNOWLEDGE_EMBEDDING_BASE_URL`、`KNOWLEDGE_EMBEDDING_MODEL`
+和 `KNOWLEDGE_EMBEDDING_DIMENSIONS`，由 Nacos 配置引用，Java 配置类不提供环境地址、模型或维度的默认值。
+数据库与 Ollama 均须能从 AI 服务进程访问；容器部署时，
+`127.0.0.1` 指容器本身，应改为宿主机或 Ollama 服务地址。
+
+首次使用前，显式执行独立的 PostgreSQL 建表脚本，应用启动不会自动修改数据库：
+
+```bash
+PGPASSWORD="$KNOWLEDGE_VECTOR_PASSWORD" psql -h YOUR_DATABASE_HOST -p 5432 -U YOUR_DATABASE_USER -d YOUR_DATABASE_NAME \
+  -f x-services/x-ai/src/main/resources/db/knowledge-pgvector-schema.sql
+```
+
+支持 TXT、Markdown、CSV、JSON、HTML、PDF 和 DOCX；文本文件使用 UTF-8，扫描 PDF 需要先 OCR。
+上传请求完成解析、重叠切片和批量向量化，页面显示索引状态，支持正文/PDF 预览、切片分页、
+语义检索及失败重试。原文默认上限 100 MB、正文上限 200 万 UTF-16 字符，切片默认 800 个
+Unicode 字符、重叠 120 个字符，可在 `knowledge` 配置中调整。
+
+`knowledge_search` 工具只检索当前用户个人文档和公共文档，返回文档来源、切片序号及相似度。
+页面试检索仅查询当前选中的作用域。公共文档管理仍要求管理员身份。
+覆盖、删除和重索引会同步使旧切片失效，索引版本校验阻止过期任务回写。
+应用在索引过程中停止时，可在页面重新索引恢复。
+
+向量维度属于列和索引约束，不属于数据库。当前使用未固定维度的 `vector` 列，按模型名称及
+维度过滤后计算余弦相似度，可在同一库保存不同维度的数据。换模型或维度后重新索引文档即可；
+旧模型切片不会参与新模型查询。当前使用精确检索，数据量增大后可为固定模型/维度增加专用 HNSW 索引。
+
+### AgentScope 2.0.4 与聊天用量
+
+AgentScope 已从 2.0.1 升至 2.0.4。已有 MySQL 数据库先执行
+`config/sql/20261109-agent-token-usage.sql`，为会话消息增加 `token_usage` 列；新库初始化 SQL 已包含该列。
+聊天按本轮所有模型调用累计主 Agent 和子 Agent 的输入、输出、缓存命中/写入、推理、工具输入、
+调用次数和模型累计耗时，流式更新并持久化。细分 token 已包含在输入或输出总量内，不能再次相加；
+模型提供方未报告的细分项显示为 0，累计模型耗时也不等于并行任务的实际耗时。
+
+本次升级同时获得 SSE 背压、并发上下文/工具/技能隔离、记忆后台 flush、子 Agent 恢复、
+HTTP/1.1 兼容及 Docker 原生文件传输等修复，并适配新版空回复重试与 MCP 注册失败回收行为。
+详细变化见 [官方发布说明](https://java.agentscope.io/v2/zh/docs/others/release-notes)，
+统计口径见 [详细 token 指标说明](https://github.com/agentscope-ai/agentscope-java/pull/3215)。
+项目已有会话控制、权限隔离文件发布和外部 API，因此此次保留这些实现，未额外接入 Service/Channel、
+Responses API 或替换为 `AgentRun`，避免引入重复的执行和发布链路。
+
 ## 4. 构建与启动
 
 ```bash
@@ -162,7 +209,7 @@ java -jar x-services/x-contact/target/x-contact-0.1.0-SNAPSHOT.jar
 
 Gateway 将 `/mcp` 转发到 **x-ai-mcp-gateway**；MCP Runtime 通过 Nacos 被 AI 服务发现，不由公网网关暴露。AI 和 MCP 路由支持长请求和 SSE。部署时 Nacos 注册 IP、Runtime 端口应在调用方网络中可达；多实例应分配不同 `ID_WORKER_ID`。
 
-沙箱共享目录需要能被 Docker daemon 挂载。远程 Docker 或多节点部署时，为 `AGENT_PUBLIC_KNOWLEDGE_DIRECTORY`、`AGENT_USER_WORKSPACE_DIRECTORY` 设置对应宿主机的绝对共享路径。
+知识库访问由 AI 服务连接 PostgreSQL 与 Ollama 完成，不再要求 Docker daemon 挂载知识目录。
 
 ## 5. 启动工作台
 

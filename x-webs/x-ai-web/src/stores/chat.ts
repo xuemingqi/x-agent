@@ -24,6 +24,7 @@ import type {
   ConversationFile,
   ConversationMessage,
   MessageRole,
+  TokenUsage,
 } from '@/types/chat';
 
 export type DisplayMessageKind = 'message' | 'status';
@@ -52,6 +53,7 @@ export interface DisplayMessage {
   processingEndedAt?: number;
   files?: ConversationFile[];
   screenshots?: BrowserScreenshotRequest[];
+  usage?: TokenUsage;
 }
 
 interface HistoryToolCall {
@@ -421,7 +423,7 @@ export const useChatStore = defineStore('chat', () => {
   /** 尚未输出内容就结束的任务不留下空白回复占位。 */
   function removeEmptyAssistantMessage(runtimeState: ConversationRuntimeState, message: DisplayMessage): void {
     if (!message.content && !message.pendingText && !message.reasoning?.length && !message.files?.length
-      && !message.screenshots?.length) {
+      && !message.screenshots?.length && !message.usage) {
       runtimeState.messages = runtimeState.messages.filter((item) => item.id !== message.id);
     }
   }
@@ -495,6 +497,10 @@ export const useChatStore = defineStore('chat', () => {
       }
       return;
     }
+    if (event.eventType === 'token_usage') {
+      assistantMessage.usage = event.structuredData.usage as TokenUsage;
+      return;
+    }
     if (event.eventType === 'task_started') {
       if (isSubagent) {
         return;
@@ -524,6 +530,7 @@ export const useChatStore = defineStore('chat', () => {
       if (isSubagent) {
         return;
       }
+      if (event.structuredData.usage) assistantMessage.usage = event.structuredData.usage as TokenUsage;
       appendEventFiles(assistantMessage, event);
       openPublishedHtml(runtimeState, event);
       const generateReason = event.generateReason || String(event.structuredData.generateReason || '');
@@ -651,6 +658,7 @@ export const useChatStore = defineStore('chat', () => {
         continue;
       }
       assistantMessage ||= createHistoryAssistant(message, result, outputFiles);
+      if (message.usage) assistantMessage.usage = message.usage;
       if (message.role === 'TOOL') {
         appendHistoryToolResult(assistantMessage, message);
         continue;

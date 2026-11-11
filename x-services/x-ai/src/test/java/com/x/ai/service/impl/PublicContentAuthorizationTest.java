@@ -2,7 +2,7 @@ package com.x.ai.service.impl;
 
 import com.x.ai.common.dto.UserSkillCreateDto;
 import com.x.ai.common.model.KnowledgeLinkParam;
-import com.x.ai.properties.AgentProperties;
+import com.x.ai.service.RagKnowledgeService;
 import com.x.ai.service.AdministratorAuthorizationService;
 import com.x.ai.service.HarnessAgentService;
 import com.x.ai.service.KnowledgeLinkFolderManagementService;
@@ -25,14 +25,14 @@ class PublicContentAuthorizationTest {
 
     @Test
     void ordinaryUserCannotWritePublicKnowledgeFile() {
-        AgentProperties properties = mock(AgentProperties.class);
-        PublicKnowledgeServiceImpl service = new PublicKnowledgeServiceImpl(authorization, properties);
+        RagKnowledgeService documents = mock(RagKnowledgeService.class);
+        PublicKnowledgeServiceImpl service = new PublicKnowledgeServiceImpl(authorization, documents);
         doThrow(new XException(ResponseCodeEnum.ADMIN_PERMISSION_REQUIRED))
                 .when(authorization).requireAdministrator("42");
 
         assertThrows(XException.class, () -> service.writeText("42", "policy.md", "不能修改公共内容"));
 
-        verifyNoInteractions(properties);
+        verifyNoInteractions(documents);
     }
 
     @Test

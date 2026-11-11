@@ -74,16 +74,14 @@ function resolveRedirect(value: unknown): string {
 
 <template>
   <main class="login-page">
-    <div class="login-glow login-glow-one" />
-    <div class="login-glow login-glow-two" />
     <section class="login-intro">
       <div class="login-brand">
-        <span>A</span>
+        <span class="agent-mark" aria-hidden="true" />
         <strong>X Agent</strong>
       </div>
       <p>智能体工作台</p>
-      <h1>让复杂工作，<br />在一次对话中完成。</h1>
-      <span>登录后配置个人模型，继续对话并管理定时任务。</span>
+      <h1>从一个目标，<br />到一份完成的工作</h1>
+      <span>配置个人模型，在独立工作区中开展对话、推进任务并查看执行过程</span>
       <div class="login-feature-list">
         <div><i />个人模型配置与会话独立管理</div>
         <div><i />任务过程实时可见、随时中止</div>
@@ -94,7 +92,7 @@ function resolveRedirect(value: unknown): string {
     <section class="login-panel">
       <form class="login-card" @submit.prevent="submit">
         <header>
-          <span>欢迎回来</span>
+          <span>智能体工作台</span>
           <h2>登录 X Agent</h2>
           <p>使用系统账号进入智能体工作台</p>
         </header>

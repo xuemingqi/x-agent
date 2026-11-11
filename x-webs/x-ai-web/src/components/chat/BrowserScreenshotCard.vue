@@ -84,7 +84,7 @@ async function respond(accepted: boolean): Promise<void> {
           </button>
         </div>
       </template>
-      <p v-else-if="request.status === 'capturing'" class="screenshot-progress">在浏览器弹窗中选择画面，完成后会自动发送。</p>
+      <p v-else-if="request.status === 'capturing'" class="screenshot-progress">在浏览器弹窗中选择画面，完成后会自动发送</p>
       <p v-else-if="request.status === 'uploading'" class="screenshot-progress">截图完成，正在上传…</p>
       <p v-if="request.error" class="screenshot-error" role="alert">{{ request.error }}</p>
       <div v-if="request.files.length" class="screenshot-images">
@@ -98,11 +98,10 @@ async function respond(accepted: boolean): Promise<void> {
 .screenshot-card {
   overflow: hidden;
   margin: 16px 0;
-  padding: 18px;
+  padding: 20px;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: 14px;
   background: var(--surface);
-  box-shadow: 0 4px 18px var(--surface-control);
 }
 
 .screenshot-card.pending {
@@ -113,7 +112,7 @@ async function respond(accepted: boolean): Promise<void> {
   margin: 12px 0;
   padding: 0;
   border-color: transparent;
-  border-radius: 10px;
+  border-radius: 8px;
   background: transparent;
   box-shadow: none;
 }
@@ -126,18 +125,18 @@ async function respond(accepted: boolean): Promise<void> {
 .screenshot-summary {
   display: flex;
   width: 100%;
-  min-height: 38px;
-  padding: 9px 10px;
+  min-height: 40px;
+  padding: 8px 12px;
   align-items: center;
   gap: 8px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 8px;
   color: var(--text-soft);
   background: transparent;
   cursor: pointer;
   font-size: 12px;
   text-align: left;
-  transition: background 150ms;
+  transition: background-color 160ms var(--ease);
 }
 
 .screenshot-summary:hover {
@@ -169,10 +168,10 @@ async function respond(accepted: boolean): Promise<void> {
 }
 
 .screenshot-summary > .summary-chevron {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   color: var(--text-muted);
-  transition: transform 150ms;
+  transition: transform 160ms var(--ease);
 }
 
 .summary-chevron.expanded {
@@ -180,7 +179,7 @@ async function respond(accepted: boolean): Promise<void> {
 }
 
 .compact .screenshot-details {
-  padding: 0 14px 14px;
+  padding: 0 16px 16px;
   border-top: 1px solid var(--line-faint);
 }
 
@@ -193,27 +192,19 @@ async function respond(accepted: boolean): Promise<void> {
 .screenshot-heading {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 12px;
 }
 
 .screenshot-symbol {
   display: grid;
-  width: 38px;
-  height: 38px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
   place-items: center;
   border: 1px solid var(--line-soft);
-  border-radius: 12px;
+  border-radius: 8px;
   color: var(--text-soft);
   background: var(--surface-subtle);
-}
-
-.pending .screenshot-symbol,
-.capturing .screenshot-symbol,
-.uploading .screenshot-symbol {
-  border-color: var(--primary-border);
-  color: var(--primary-icon);
-  background: var(--primary-fill);
 }
 
 .received .screenshot-symbol {
@@ -223,21 +214,21 @@ async function respond(accepted: boolean): Promise<void> {
 }
 
 .screenshot-symbol svg {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
 }
 
 .screenshot-title {
   display: grid;
   min-width: 0;
   flex: 1;
-  gap: 5px;
+  gap: 4px;
 }
 
 .screenshot-title strong {
   color: var(--text-heading);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.5;
 }
 
@@ -248,12 +239,9 @@ async function respond(accepted: boolean): Promise<void> {
 
 .consent-badge {
   flex-shrink: 0;
-  padding: 3px 7px;
-  border: 1px solid var(--primary-border);
-  border-radius: 6px;
+  padding: 4px 0 4px 8px;
   color: var(--text-accent);
-  background: var(--primary-fill);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .screenshot-reason {
@@ -269,17 +257,17 @@ async function respond(accepted: boolean): Promise<void> {
   display: flex;
   width: 100%;
   min-width: 0;
-  margin-top: 14px;
-  padding: 10px 11px;
+  margin-top: 12px;
+  padding: 12px;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   border: 1px solid var(--line-soft);
-  border-radius: 9px;
+  border-radius: 8px;
   color: var(--text-soft);
   background: var(--surface-subtle);
   cursor: pointer;
   text-align: left;
-  transition: background 150ms, border-color 150ms;
+  transition: background-color 160ms var(--ease), border-color 160ms var(--ease);
 }
 
 .preview-link:hover {
@@ -308,29 +296,24 @@ async function respond(accepted: boolean): Promise<void> {
 }
 
 .preview-link .preview-arrow {
-  width: 13px;
-  height: 13px;
+  width: 16px;
+  height: 16px;
   color: var(--text-muted);
-  transition: transform 150ms;
-}
-
-.preview-link:hover .preview-arrow {
-  transform: translateX(2px);
 }
 
 .screenshot-permission {
   display: flex;
-  margin: 14px 0 16px;
+  margin: 12px 0 16px;
   align-items: flex-start;
-  gap: 5px;
+  gap: 8px;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.7;
 }
 
 .screenshot-permission svg {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
   margin-top: 2px;
 }
@@ -347,13 +330,13 @@ async function respond(accepted: boolean): Promise<void> {
   padding: 8px 12px;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 12px;
-  font-weight: 550;
-  transition: background 150ms, box-shadow 150ms;
+  font-weight: 500;
+  transition: background-color 160ms var(--ease), border-color 160ms var(--ease), color 160ms var(--ease);
 }
 
 .screenshot-actions svg {
@@ -372,19 +355,21 @@ async function respond(accepted: boolean): Promise<void> {
   background: var(--surface-control-hover);
 }
 
-.consent-action {
-  color: var(--text-on-accent);
-  background: linear-gradient(135deg, var(--primary-gradient-start), var(--primary-gradient-end));
-  box-shadow: 0 3px 8px var(--primary-fill-strong);
+.screenshot-actions .consent-action {
+  border-color: var(--primary-action-border);
+  color: var(--primary-action-text);
+  background: var(--primary-action-bg);
 }
 
-.consent-action:hover {
-  box-shadow: 0 4px 12px var(--primary-border-medium);
+.screenshot-actions .consent-action:hover {
+  border-color: var(--primary-action-hover-border);
+  color: var(--primary-action-hover-text);
+  background: var(--primary-action-hover-bg);
 }
 
 button:focus-visible {
   outline: 2px solid var(--primary);
-  outline-offset: 3px;
+  outline-offset: 2px;
 }
 
 .screenshot-progress,
@@ -405,7 +390,7 @@ button:focus-visible {
 
 @media (max-width: 480px) {
   .screenshot-card {
-    padding: 14px;
+    padding: 16px;
   }
 
   .screenshot-actions button {

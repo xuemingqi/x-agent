@@ -1,6 +1,7 @@
 package com.x.ai.service.impl;
 
 import com.x.ai.common.domain.ConversationMessageDo;
+import com.x.ai.common.model.TokenUsageAccumulator;
 import com.x.ai.db.enums.ConversationMessageRole;
 import com.x.framework.common.utils.StringUtil;
 import com.x.ai.service.ConversationService;
@@ -8,6 +9,7 @@ import com.x.ai.service.ConversationTurnRecordService;
 import io.agentscope.core.event.AgentEndEvent;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.event.AgentResultEvent;
+import io.agentscope.core.event.ModelCallEndEvent;
 import io.agentscope.core.event.TextBlockDeltaEvent;
 import io.agentscope.core.event.ThinkingBlockDeltaEvent;
 import io.agentscope.core.event.ToolCallStartEvent;
@@ -63,6 +65,8 @@ public class ConversationTurnRecordServiceImpl implements ConversationTurnRecord
 
         private final List<ConversationMessageDo> messages = new ArrayList<>();
 
+        private final TokenUsageAccumulator usage = new TokenUsageAccumulator();
+
         private final StringBuilder pendingText = new StringBuilder();
 
         private final StringBuilder pendingReasoning = new StringBuilder();
@@ -77,6 +81,7 @@ public class ConversationTurnRecordServiceImpl implements ConversationTurnRecord
         private void record(AgentEvent event) {
             String source = event.getSource();
             switch (event) {
+                case ModelCallEndEvent end -> usage.record(end);
                 case TextBlockDeltaEvent text -> recordText(source, text.getReplyId(), text.getDelta());
                 case ThinkingBlockDeltaEvent thinking ->
                         recordReasoning(source, thinking.getReplyId(), thinking.getDelta());
@@ -124,6 +129,16 @@ public class ConversationTurnRecordServiceImpl implements ConversationTurnRecord
         private List<ConversationMessageDo> drainMessages() {
             recordPendingText();
             recordPendingSubagentReasoning();
+            if (usage.snapshot().getModelCalls() > 0) {
+                ConversationMessageDo last = messages.stream()
+                        .filter(item -> item.getRole() == ConversationMessageRole.ASSISTANT)
+                        .reduce((first, second) -> second).orElse(null);
+                if (last == null) {
+                    last = message(ConversationMessageRole.ASSISTANT, "", null);
+                    messages.add(last);
+                }
+                last.setUsage(usage.snapshot());
+            }
             List<ConversationMessageDo> result = List.copyOf(messages);
             messages.clear();
             return result;

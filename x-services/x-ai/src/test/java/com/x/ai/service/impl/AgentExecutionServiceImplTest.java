@@ -1,6 +1,8 @@
 package com.x.ai.service.impl;
 
 import com.x.ai.common.domain.AgentResponseDo;
+import com.x.ai.common.domain.TokenUsageDo;
+import com.x.ai.common.model.TokenUsageAccumulator;
 import com.x.ai.common.dto.AgentRequestDto;
 import com.x.ai.common.enums.AgentEventType;
 import com.x.ai.common.model.AiModelRuntimeConfig;
@@ -19,6 +21,9 @@ import io.agentscope.core.ReActAgent;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEndEvent;
 import io.agentscope.core.event.AgentEvent;
+import io.agentscope.core.event.ModelCallEndEvent;
+import io.agentscope.core.message.AssistantMessage;
+import io.agentscope.core.model.ChatUsage;
 import io.agentscope.core.event.TextBlockDeltaEvent;
 import io.agentscope.harness.agent.HarnessAgent;
 import org.junit.jupiter.api.BeforeEach;
@@ -94,6 +99,41 @@ class AgentExecutionServiceImplTest {
         when(agent.getDelegate()).thenReturn(delegate);
         when(agents.executeStream(eq(agent), any(), any())).thenReturn(Flux.just(
                 new TextBlockDeltaEvent("reply-1", "text-1", "hello"), new AgentEndEvent("reply-1")));
+    }
+
+    @Test
+    void emitsCumulativeUsageAcrossModelCallsAndIgnoresRepeatedForwardedEvents() {
+        ModelCallEndEvent child = new ModelCallEndEvent("child", new ChatUsage(100, 20, 0.2));
+        child.withSource("main/researcher");
+        when(agents.executeStream(eq(agent), any(), any())).thenReturn(Flux.just(child, child,
+                new ModelCallEndEvent("main", ChatUsage.builder().inputTokens(50).outputTokens(10)
+                        .reasoningTokens(5).cachedTokens(30).build()), new AgentEndEvent("main")));
+
+        List<AgentResponseDo> results = service.streamRun(user, request).collectList().block(TEST_TIMEOUT);
+        List<TokenUsageDo> snapshots = results.stream()
+                .filter(result -> result.getEventType() == AgentEventType.TOKEN_USAGE)
+                .map(result -> (TokenUsageDo) result.getStructuredData().get("usage")).toList();
+
+        assertThat(snapshots).extracting(TokenUsageDo::getTotalTokens).containsExactly(120L, 120L, 180L);
+        assertThat(snapshots.getLast().getModelCalls()).isEqualTo(2);
+        assertThat(snapshots.getLast().getReasoningTokens()).isEqualTo(5);
+    }
+
+    @Test
+    void blockingResponsesIncludeUsageFromEveryModelCall() {
+        when(agents.executeBlocking(eq(agent), any(), any())).thenAnswer(invocation -> {
+            RuntimeContext context = invocation.getArgument(2);
+            TokenUsageAccumulator usage = context.get(TokenUsageAccumulator.class);
+            usage.record(new ModelCallEndEvent("first", new ChatUsage(100, 20, 0.2)));
+            usage.record(new ModelCallEndEvent("second", new ChatUsage(50, 10, 0.1)));
+            return Mono.just(new AssistantMessage("最终答案"));
+        });
+
+        AgentResponseDo result = service.runStandalone(user, request);
+
+        TokenUsageDo usage = (TokenUsageDo) result.getStructuredData().get("usage");
+        assertThat(usage.getTotalTokens()).isEqualTo(180);
+        assertThat(usage.getModelCalls()).isEqualTo(2);
     }
 
     @Test

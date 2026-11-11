@@ -13,9 +13,9 @@ const formattedBody = computed(() => {
 <template>
   <section class="response-panel" :aria-busy="pending">
     <div class="section-heading">
-      <h2>响应 <span class="eyebrow">RESPONSE</span></h2>
+      <h2>响应 <span class="eyebrow">Response</span></h2>
       <div v-if="response" class="response-metrics">
-        <span :class="['status-tag', { failed: response.statusCode < 200 || response.statusCode >= 300 || response.error }]">{{ response.statusCode || 'NETWORK ERROR' }}</span>
+        <span :class="['status-tag', { failed: response.statusCode < 200 || response.statusCode >= 300 || response.error }]">{{ response.statusCode || 'Network error' }}</span>
         <span>{{ response.elapsedMs.toFixed(1) }} ms</span>
         <span>{{ (response.responseBytes / 1024).toFixed(1) }} KB</span>
       </div>
@@ -41,15 +41,15 @@ const formattedBody = computed(() => {
 </template>
 
 <style scoped>
-.response-metrics { display: flex; align-items: center; gap: 14px; font-family: var(--lab-mono); font-size: 12px; }
-.status-tag { background: color-mix(in srgb, var(--lab-accent) 12%, transparent); color: var(--lab-accent); padding: 4px 8px; border-radius: 5px; }
-.status-tag.failed { color: #d96956; background: #d9695612; }
-.empty-response { min-height: 235px; display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--text-soft); }
+.response-metrics { display: flex; align-items: center; gap: 16px; font-family: var(--lab-mono); font-size: 12px; }
+.status-tag { background: color-mix(in srgb, var(--lab-accent) 12%, transparent); color: var(--lab-accent); padding: 4px 8px; border-radius: 8px; }
+.status-tag.failed { color: var(--danger-text); background: var(--danger-soft); }
+.empty-response { min-height: 240px; display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--text-soft); }
 .empty-response strong { font-weight: 500; color: var(--text); }
 .empty-response p { font-size: 12px; text-align: center; }
 .empty-glyph { font-size: 28px; margin-bottom: 16px; color: var(--lab-accent); }
-.response-code { margin: 0; padding: 18px; min-height: 200px; max-height: 440px; overflow: auto; background: var(--lab-code-bg); font-family: var(--lab-mono); font-size: 12px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 8px; }
-.response-headers { display: grid; grid-template-columns: minmax(100px, 1fr) 2fr; font: 12px/1.8 var(--lab-mono); gap: 8px 18px; max-height: 380px; overflow: auto; }
+.response-code { margin: 0; padding: 20px; min-height: 200px; max-height: 440px; overflow: auto; background: var(--lab-code-bg); font-family: var(--lab-mono); font-size: 12px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 8px; }
+.response-headers { display: grid; grid-template-columns: minmax(100px, 1fr) 2fr; font: 12px/1.8 var(--lab-mono); gap: 8px 20px; max-height: 380px; overflow: auto; }
 .response-headers dt { color: var(--text-soft); overflow-wrap: anywhere; }
 .response-headers dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 </style>

@@ -85,7 +85,8 @@ public class MultimodalResponseMiddleware implements HarnessRuntimeMiddleware {
                 AgentState state = response.getAgentState();
                 ((ReActAgent) agent).saveAgentState(state.getUserId(), state.getSessionId());
             }
-            return new AgentResultEvent(event.getId(), event.getSource(), restored)
+            return new AgentResultEvent(event.getId(), event.getCreatedAt(), restored)
+                    .withSource(event.getSource())
                     .withMetadata(event.getMetadata());
         }).subscribeOn(Schedulers.boundedElastic());
     }

@@ -1,11 +1,43 @@
 import { request, requestBlob } from './http';
 import type {
+  KnowledgeChunkPage,
   KnowledgeDocument,
   KnowledgeLink,
   KnowledgeLinkFolder,
   KnowledgeLinkFolderPayload,
   KnowledgeLinkPayload,
+  KnowledgePreview,
+  KnowledgeScope,
+  KnowledgeSearchResult,
 } from '@/types/knowledge';
+
+function documentUrl(scope: KnowledgeScope): string {
+  return scope === 'public' ? '/administration/knowledge/documents' : '/knowledge/documents';
+}
+
+export function getKnowledgeDocumentPreview(path: string, scope: KnowledgeScope): Promise<KnowledgePreview> {
+  return request<KnowledgePreview>({ url: `${documentUrl(scope)}/preview`, method: 'GET', params: { path } });
+}
+
+export function listKnowledgeDocumentChunks(path: string, scope: KnowledgeScope,
+  page = 1, size = 20): Promise<KnowledgeChunkPage> {
+  return request<KnowledgeChunkPage>({
+    url: `${documentUrl(scope)}/chunks`, method: 'GET', params: { path, page, size },
+  });
+}
+
+export function reindexKnowledgeDocument(path: string, scope: KnowledgeScope): Promise<KnowledgeDocument> {
+  return request<KnowledgeDocument>({
+    url: `${documentUrl(scope)}/reindex`, method: 'POST', params: { path }, timeout: 300000,
+  });
+}
+
+export function searchKnowledgeDocuments(query: string, scope: KnowledgeScope,
+  limit = 6): Promise<KnowledgeSearchResult[]> {
+  return request<KnowledgeSearchResult[]>({
+    url: `${documentUrl(scope)}/search`, method: 'POST', data: { query, limit }, timeout: 300000,
+  });
+}
 
 export function listKnowledgeDocuments(): Promise<KnowledgeDocument[]> {
   return request<KnowledgeDocument[]>({ url: '/knowledge/documents', method: 'GET' });

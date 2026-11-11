@@ -50,7 +50,10 @@ interface McpForm {
 
 type DialogMode = 'create' | 'edit' | 'view' | 'credential';
 
-const props = withDefaults(defineProps<{ administrator?: boolean }>(), { administrator: false });
+const props = withDefaults(defineProps<{
+  administrator?: boolean;
+  showScopeSwitch?: boolean;
+}>(), { administrator: false, showScopeSwitch: true });
 const activeScope = defineModel<McpScope>('activeScope', { default: MCP_SCOPE.USER });
 const servers = ref<McpServer[]>([]);
 const loading = ref(false);
@@ -350,7 +353,7 @@ watch(() => props.administrator, (administrator, previous) => {
 
 <template>
   <div class="mcp-management">
-    <div class="scope-switch">
+    <div v-if="showScopeSwitch" class="scope-switch">
       <button :class="{ active: activeScope === MCP_SCOPE.USER }" @click="activeScope = MCP_SCOPE.USER">
         <el-icon><User /></el-icon>
         我的 MCP
@@ -364,14 +367,14 @@ watch(() => props.administrator, (administrator, previous) => {
       </button>
     </div>
 
-    <p class="extension-enablement-hint">开关仅对我生效，下一轮对话生效。</p>
+    <p v-if="showScopeSwitch" class="extension-enablement-hint">开关仅对我生效 · 下一轮对话生效</p>
     <div v-loading="loading" class="mcp-grid">
       <article v-for="server in visibleServers" :key="server.id" class="mcp-card"
         :class="{ 'extension-disabled': !server.enabled || !server.userEnabled }">
         <div class="skill-card-head">
           <div class="extension-icon mcp"><el-icon><Connection /></el-icon></div>
           <div>
-            <span>{{ server.scope === MCP_SCOPE.USER ? 'PERSONAL MCP' : 'PLATFORM MCP' }}</span>
+            <span>{{ server.scope === MCP_SCOPE.USER ? '个人 MCP' : '公共 MCP' }}</span>
             <h2>{{ server.name }}</h2>
           </div>
           <div class="extension-enablement"
@@ -430,8 +433,13 @@ watch(() => props.administrator, (administrator, previous) => {
       </article>
       <el-empty
         v-if="!loading && !visibleServers.length"
+        :image-size="56"
         :description="activeScope === MCP_SCOPE.USER ? '还没有个人 MCP' : '暂无公共 MCP'"
-      />
+      >
+        <template #image>
+          <span class="empty-state-icon" aria-hidden="true"><el-icon><Connection /></el-icon></span>
+        </template>
+      </el-empty>
     </div>
 
     <el-dialog
@@ -661,3 +669,81 @@ watch(() => props.administrator, (administrator, previous) => {
     </el-dialog>
   </div>
 </template>
+
+<style scoped>
+.mcp-management {
+  width: 100%;
+  min-width: 0;
+}
+
+.mcp-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
+  min-height: 0;
+  align-items: stretch;
+}
+
+.mcp-card {
+  min-height: 0;
+  padding: 24px;
+  border-radius: 12px;
+}
+
+.mcp-card .extension-icon {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  color: var(--text-soft);
+  background: var(--surface-subtle);
+  font-size: 18px;
+}
+
+.mcp-card h2 {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.mcp-card > p {
+  margin: 16px 0 20px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.mcp-card dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-bottom: 20px;
+}
+
+.mcp-card dl div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.mcp-card dd {
+  margin: 0;
+  font-size: 12px;
+}
+
+.mcp-card .skill-actions {
+  margin-top: auto;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.mcp-card .skill-actions :deep(.el-button) {
+  margin-left: 0;
+  padding: 0 8px;
+}
+
+@container workspace (max-width: 760px) {
+  .mcp-grid { grid-template-columns: minmax(0, 1fr); }
+  .mcp-card { padding: 20px; }
+}
+</style>

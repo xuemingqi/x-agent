@@ -145,10 +145,10 @@ async function removeQueuedMessage(messageId: string): Promise<void> {
     <div class="workspace-content" :class="{ 'with-preview': chat.previewFile && chat.previewOpen }">
       <section class="chat-page">
         <div v-if="!chat.messages.length && !chat.loading" class="chat-hero">
-          <div class="hero-orb"><span>AI</span></div>
-          <p>通用智能体工作台</p>
-          <h1>今天想一起完成什么？</h1>
-          <span>选择模型，描述目标，我会在隔离的工作区内完成任务。</span>
+          <div class="workspace-mark agent-mark" aria-hidden="true" />
+          <p>X Agent 工作台</p>
+          <h1>开始一项新任务</h1>
+          <span>描述目标、上传资料，或输入 / 调用 Skill</span>
         </div>
         <ChatTimeline
           v-else
@@ -204,18 +204,18 @@ async function removeQueuedMessage(messageId: string): Promise<void> {
   display: flex;
   height: 56px;
   flex: 0 0 56px;
-  padding: 0 20px 0 26px;
+  padding: 0 24px;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  border-bottom: 1px solid var(--line-faint);
+  border-bottom: 1px solid transparent;
 }
 
 .workspace-title {
   overflow: hidden;
   color: var(--text-soft);
   font-size: 13px;
-  font-weight: 550;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -228,11 +228,11 @@ async function removeQueuedMessage(messageId: string): Promise<void> {
   flex-shrink: 0;
   place-items: center;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: 8px;
   color: var(--text-muted);
   background: transparent;
   cursor: pointer;
-  transition: background 150ms, color 150ms, border-color 150ms;
+  transition: background-color 160ms var(--ease), color 160ms var(--ease), border-color 160ms var(--ease);
 }
 
 .preview-toggle.available:hover {
@@ -257,8 +257,8 @@ async function removeQueuedMessage(messageId: string): Promise<void> {
 }
 
 .preview-toggle svg {
-  width: 21px;
-  height: 21px;
+  width: 18px;
+  height: 18px;
   stroke: currentColor;
   stroke-width: 1.5;
 }
@@ -288,7 +288,7 @@ async function removeQueuedMessage(messageId: string): Promise<void> {
 }
 
 .workspace-content.with-preview {
-  grid-template-columns: minmax(360px, 1fr) minmax(320px, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
 .chat-page {
@@ -299,7 +299,7 @@ async function removeQueuedMessage(messageId: string): Promise<void> {
   padding-top: 28px;
 }
 
-@media (max-width: 900px) {
+@container workspace (max-width: 800px) {
   .workspace-content.with-preview {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(350px, 1fr) minmax(260px, 36%);

@@ -25,7 +25,7 @@ const notesEnabled = ref(true);
       <span class="avatar">M</span>
     </div>
     <div class="preview-body">
-      <span class="preview-eyebrow">A LITTLE ROOM FOR IDEAS</span>
+      <span class="preview-eyebrow">A little room for ideas</span>
       <h2>
         把日子，
         <br>
@@ -45,7 +45,6 @@ const notesEnabled = ref(true);
       <div class="preview-cards">
         <article class="note-card">
           <div class="note-heading">
-            <span class="note-icon">✳</span>
             <span>今日的小确幸</span>
             <span class="note-tag">随手记</span>
           </div>
@@ -57,7 +56,6 @@ const notesEnabled = ref(true);
         </article>
         <article class="settings-card">
           <div>
-            <span class="note-icon">◷</span>
             <strong>慢慢来，也很好</strong>
           </div>
           <p>让灵感有处可放。</p>
@@ -76,7 +74,7 @@ const notesEnabled = ref(true);
         </article>
       </div>
       <div class="preview-footer">
-        <span>MADE OF SMALL MOMENTS</span>
+        <span>Made of small moments</span>
         <span>01 / 07</span>
       </div>
     </div>
@@ -88,9 +86,9 @@ const notesEnabled = ref(true);
   color: var(--color-text);
   background: var(--color-background);
   border: 1px solid var(--color-border);
-  border-radius: 18px;
+  border-radius: 14px;
   overflow: hidden;
-  transition: background .25s, color .25s;
+  transition: background-color 240ms var(--ease), color 240ms var(--ease);
   container-type: inline-size;
 }
 
@@ -98,7 +96,7 @@ const notesEnabled = ref(true);
   display: flex;
   align-items: center;
   gap: 20px;
-  padding: 18px 28px;
+  padding: 20px 28px;
   border-bottom: 1px solid var(--color-border);
   font-size: 11px;
   color: var(--color-muted-text);
@@ -107,10 +105,10 @@ const notesEnabled = ref(true);
 .preview-logo {
   font-size: 15px;
   color: var(--color-text);
-  font-weight: 700;
+  font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   margin-right: auto;
 }
 
@@ -123,12 +121,12 @@ const notesEnabled = ref(true);
 }
 
 .nav-dot {
-  margin: 0 7px;
+  margin: 0 8px;
 }
 
 .avatar {
-  width: 27px;
-  height: 27px;
+  width: 28px;
+  height: 28px;
   display: grid;
   place-items: center;
   border: 1px solid var(--color-border);
@@ -136,21 +134,19 @@ const notesEnabled = ref(true);
 }
 
 .preview-body {
-  padding: 32px;
+  padding: 24px;
 }
 
 .preview-eyebrow {
   color: var(--color-muted-text);
-  font-size: 9px;
-  letter-spacing: 2px;
+  font-size: 11px;
 }
 
 h2 {
-  font-size: clamp(26px, 5cqw, 42px);
+  font-size: clamp(24px, 4cqw, 36px);
   line-height: 1.4;
-  letter-spacing: -1px;
-  font-weight: 600;
-  margin: 18px 0 14px;
+  font-weight: 500;
+  margin: 20px 0 16px;
   color: var(--color-text);
 }
 
@@ -164,12 +160,12 @@ h2 {
   display: flex;
   gap: 16px;
   align-items: center;
-  margin: 23px 0 28px;
+  margin: 24px 0 28px;
 }
 
 .preview-actions > span {
   color: var(--color-muted-text);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 button {
@@ -181,7 +177,7 @@ button {
   background: var(--color-primary);
   color: var(--color-on-primary);
   border: none;
-  padding: 12px 18px;
+  padding: 12px 20px;
   border-radius: 8px;
   font-size: 12px;
 }
@@ -189,27 +185,21 @@ button {
 .preview-cards {
   display: grid;
   grid-template-columns: 1.4fr 1fr;
-  gap: 14px;
+  gap: 16px;
 }
 
 .preview-cards article {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 18px;
+  border-radius: 8px;
+  padding: 20px;
   font-size: 11px;
 }
 
 .note-heading {
   display: flex;
   align-items: center;
-  gap: 7px;
-}
-
-.note-icon {
-  color: var(--color-text);
-  font-size: 20px;
-  margin-right: 5px;
+  gap: 8px;
 }
 
 .note-tag {
@@ -217,32 +207,37 @@ button {
   color: var(--color-muted-text);
   border: 1px solid var(--color-border);
   border-radius: 4px;
-  padding: 3px 5px;
-  font-size: 9px;
+  padding: 4px 8px;
+  font-size: 11px;
 }
 
 .preview-cards p {
   color: var(--color-muted-text);
   line-height: 1.8;
-  margin: 14px 0;
+  margin: 16px 0;
 }
 
 .preview-input-label {
   display: grid;
-  gap: 7px;
-  font-size: 10px;
+  gap: 8px;
+  font-size: 11px;
 }
 
 .preview-input-label input {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   color: var(--color-text);
-  border-radius: 6px;
-  padding: 10px;
+  border-radius: 8px;
+  padding: 12px;
   width: 100%;
   min-width: 0;
   font: inherit;
-  outline-offset: 3px;
+  outline-offset: 2px;
+}
+
+:is(button, input):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .preview-input-label input::placeholder {
@@ -261,21 +256,21 @@ button {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  gap: 10px;
+  gap: 12px;
   border: 0;
   border-top: 1px solid var(--color-border);
-  padding: 13px 0 0;
+  padding: 12px 0 0;
   background: transparent;
   color: var(--color-text);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .preview-switch {
   background: var(--color-border);
-  width: 30px;
-  height: 18px;
-  border-radius: 20px;
-  padding: 3px;
+  width: 32px;
+  height: 20px;
+  border-radius: 10px;
+  padding: 4px;
   flex-shrink: 0;
 }
 
@@ -297,17 +292,16 @@ button {
 
 .preview-footer {
   border-top: 1px solid var(--color-border);
-  margin-top: 26px;
-  padding-top: 15px;
+  margin-top: 24px;
+  padding-top: 16px;
   display: flex;
   justify-content: space-between;
-  font-size: 8px;
-  letter-spacing: 1px;
+  font-size: 11px;
   color: var(--color-muted-text);
 }
 
 .compact .preview-body {
-  padding: 22px;
+  padding: 24px;
 }
 
 .compact .preview-actions > span, .compact .settings-card {
@@ -320,7 +314,7 @@ button {
 
 @container (max-width: 440px) {
   .preview-body {
-    padding: 22px;
+    padding: 24px;
   }
   .preview-nav {
     padding: 16px 20px;
@@ -334,5 +328,8 @@ button {
   .settings-card {
     display: none;
   }
+}
+@media (prefers-reduced-motion: reduce) {
+  .theme-preview { transition: none; }
 }
 </style>

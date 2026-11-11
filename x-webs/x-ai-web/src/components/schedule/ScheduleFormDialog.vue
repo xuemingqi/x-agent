@@ -87,7 +87,7 @@ function submit(): void {
       <div class="content-dialog-heading">
         <div class="content-dialog-heading-icon"><el-icon><Calendar /></el-icon></div>
         <div>
-          <span>AUTOMATION</span>
+          <span>Automation</span>
           <strong>{{ title }}</strong>
           <p>{{ task ? '调整任务内容与执行时间。' : '安排好重复工作，交给 Agent 自动完成。' }}</p>
         </div>

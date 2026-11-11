@@ -5,6 +5,8 @@ import com.x.ai.db.enums.ConversationMessageRole;
 import com.x.ai.service.ConversationService;
 import io.agentscope.core.event.AgentResultEvent;
 import io.agentscope.core.event.AgentEndEvent;
+import io.agentscope.core.event.ModelCallEndEvent;
+import io.agentscope.core.model.ChatUsage;
 import io.agentscope.core.event.TextBlockDeltaEvent;
 import io.agentscope.core.message.AssistantMessage;
 import io.agentscope.core.message.DataBlock;
@@ -23,6 +25,27 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 class ConversationTurnRecordServiceTest {
+
+    @Test
+    void archivesAccumulatedUsageOnTheFinalMessageIncludingSubagentCalls() {
+        ConversationService conversations = mock(ConversationService.class);
+        ConversationTurnRecordServiceImpl service = new ConversationTurnRecordServiceImpl(conversations);
+        ModelCallEndEvent child = new ModelCallEndEvent("child-reply", new ChatUsage(100, 20, 0.2));
+        child.withSource("main/researcher");
+
+        service.record("user-1", "session-1", 10L, Flux.just(
+                child, child,
+                new ModelCallEndEvent("main-reply", ChatUsage.builder().inputTokens(50).outputTokens(10)
+                        .reasoningTokens(5).cachedTokens(30).build()),
+                new AgentResultEvent(new AssistantMessage("最终答案")), new AgentEndEvent("main-reply"))).blockLast();
+
+        ArgumentCaptor<List<ConversationMessageDo>> messages = ArgumentCaptor.captor();
+        verify(conversations).appendMessages(eq("user-1"), eq("session-1"), eq(10L), messages.capture());
+        assertThat(messages.getValue()).hasSize(1);
+        assertThat(messages.getValue().getFirst().getUsage().getTotalTokens()).isEqualTo(180);
+        assertThat(messages.getValue().getFirst().getUsage().getModelCalls()).isEqualTo(2);
+        assertThat(messages.getValue().getFirst().getUsage().getReasoningTokens()).isEqualTo(5);
+    }
 
     @Test
     void archivesPartialOutputWithoutTheSdkInterruptionGreeting() {

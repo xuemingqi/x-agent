@@ -31,7 +31,7 @@ const latencyPoints = computed(() => chart.value.map((point, index) =>
 <template>
   <section class="load-panel">
     <div class="section-heading">
-      <h2>接口压测 <span class="eyebrow">LOAD TEST</span></h2>
+      <h2>接口压测 <span class="eyebrow">Load test</span></h2>
       <span v-if="result" :class="['run-status', { running }]">{{ statusNames[result.status] }} · {{ result.elapsedSeconds.toFixed(1) }} s</span>
     </div>
     <form class="load-options" @submit.prevent="$emit('start', { ...options })">
@@ -78,30 +78,30 @@ const latencyPoints = computed(() => chart.value.map((point, index) =>
 
 <style scoped>
 .load-options { display: grid; grid-template-columns: repeat(3, minmax(70px, 1fr)) auto; align-items: end; gap: 12px; }
-.load-options label { display: flex; flex-direction: column; gap: 9px; font-size: 12px; color: var(--text-soft); }
+.load-options label { display: flex; flex-direction: column; gap: 8px; font-size: 12px; color: var(--text-soft); }
 .load-options input { width: 100%; }
-.load-hint { font-size: 11px; margin: 14px 0 24px; }
+.load-hint { font-size: 11px; margin: 16px 0 24px; }
 .run-status { font-size: 12px; color: var(--text-soft); }
 .run-status.running { color: var(--lab-accent); }
 .run-target { font-family: var(--lab-mono); font-size: 12px; overflow-wrap: anywhere; color: var(--text-soft); }
 .run-target strong { color: var(--lab-accent); }
-.metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 18px 0; }
-.metrics-grid article { padding: 15px; border: 1px solid var(--line); border-radius: 8px; }
+.metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 16px 0; }
+.metrics-grid article { padding: 16px; border: 1px solid var(--line); border-radius: 8px; }
 .metrics-grid article > span { font-size: 11px; color: var(--text-soft); }
-.metrics-grid strong { display: block; font: 25px var(--lab-mono); margin-top: 12px; }
-.metrics-grid small { font: 11px var(--lab-mono); margin-left: 5px; color: var(--text-soft); }
-.charts { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.metrics-grid strong { display: block; font: 24px var(--lab-mono); margin-top: 12px; }
+.metrics-grid small { font: 11px var(--lab-mono); margin-left: 4px; color: var(--text-soft); }
+.charts { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .charts figure { margin: 4px 0 16px; min-width: 0; }
 .charts figcaption { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-soft); }
-.charts svg { width: 100%; margin-top: 14px; }
+.charts svg { width: 100%; margin-top: 16px; }
 .chart-grid { stroke: var(--line); stroke-width: 1; fill: none; }
 .latency-line { stroke: var(--lab-accent); stroke-width: 3; fill: none; }
 .throughput-bar { fill: #779bdf; }
-.chart-axis { display: flex; justify-content: space-between; font: 10px var(--lab-mono); color: var(--text-soft); }
-.status-distribution { display: flex; gap: 10px; flex-wrap: wrap; }
-.status-distribution span { background: var(--surface-soft); padding: 6px 10px; font: 11px var(--lab-mono); border-radius: 5px; }
+.chart-axis { display: flex; justify-content: space-between; font: 11px var(--lab-mono); color: var(--text-soft); }
+.status-distribution { display: flex; gap: 12px; flex-wrap: wrap; }
+.status-distribution span { background: var(--surface-soft); padding: 8px 12px; font: 11px var(--lab-mono); border-radius: 8px; }
 .status-distribution strong { margin-left: 8px; }
-.load-empty { padding: 36px 10px; display: flex; align-items: center; flex-direction: column; color: var(--text-soft); }
+.load-empty { padding: 36px 12px; display: flex; align-items: center; flex-direction: column; color: var(--text-soft); }
 .load-empty > span { font-size: 28px; margin-bottom: 16px; color: var(--lab-accent); }
 .load-empty strong { font-size: 14px; font-weight: 500; color: var(--text); }
 .load-empty p { font-size: 12px; }

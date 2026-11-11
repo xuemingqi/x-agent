@@ -25,13 +25,13 @@ import com.x.ai.service.McpRuntimeService;
 import com.x.ai.service.PublicResourceVersionService;
 import com.x.ai.service.ResourceEnablementService;
 import com.x.ai.service.SkillRuntimeService;
-import com.x.ai.service.UserWorkspaceService;
 import com.x.ai.skill.SkillRuntimeWorkspace;
 import com.x.ai.tool.AgentScheduleTools;
 import com.x.ai.tool.BrowserScreenshotTools;
 import com.x.ai.tool.ConversationFileTools;
 import com.x.ai.tool.KnowledgeLinkManagementTools;
 import com.x.ai.tool.KnowledgeLinkTools;
+import com.x.ai.tool.KnowledgeSearchTools;
 import com.x.ai.tool.McpServerTools;
 import com.x.ai.tool.PublicAdministrationTools;
 import com.x.ai.tool.SkillManagementTools;
@@ -41,6 +41,7 @@ import com.x.ai.tool.middleware.InterruptResponseMiddleware;
 import com.x.ai.tool.middleware.MultimodalResponseMiddleware;
 import com.x.ai.tool.middleware.SubagentExecutionMiddleware;
 import com.x.ai.tool.middleware.ToolAuthorizationMiddleware;
+import com.x.ai.tool.middleware.TokenUsageMiddleware;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEndEvent;
 import io.agentscope.core.event.AgentEvent;
@@ -67,8 +68,6 @@ import io.agentscope.harness.agent.memory.compaction.CompactionConfig;
 import io.agentscope.harness.agent.memory.compaction.ToolResultEvictionConfig;
 import io.agentscope.harness.agent.sandbox.WorkspaceSpec;
 import io.agentscope.harness.agent.sandbox.impl.docker.DockerFilesystemSpec;
-import io.agentscope.harness.agent.sandbox.layout.BindMountEntry;
-import io.agentscope.harness.agent.sandbox.layout.WorkspaceEntry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -82,7 +81,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -119,6 +117,10 @@ public class HarnessAgentServiceImpl implements HarnessAgentService, AutoCloseab
 
     private final ObjectProvider<KnowledgeLinkTools> knowledgeLinkTools;
 
+    private final ObjectProvider<KnowledgeSearchTools> knowledgeSearchTools;
+
+    private final TokenUsageMiddleware tokenUsageMiddleware;
+
     private final ObjectProvider<KnowledgeLinkManagementTools> knowledgeLinkManagementTools;
 
     private final ObjectProvider<McpServerTools> mcpServerTools;
@@ -132,8 +134,6 @@ public class HarnessAgentServiceImpl implements HarnessAgentService, AutoCloseab
     private final SkillRuntimeService skillRuntimeService;
 
     private final ObjectProvider<SkillManagementTools> skillManagementTools;
-
-    private final UserWorkspaceService userWorkspaceService;
 
     private final McpRuntimeService mcpRuntimeService;
 
@@ -262,7 +262,7 @@ public class HarnessAgentServiceImpl implements HarnessAgentService, AutoCloseab
                                      AgentRuntimeConfiguration configuration, SkillRuntimeSnapshot skills) {
         checkAgentCreationInterrupted();
         DistributedStore runtimeStore = agentScopeStoreService.createRuntimeStore();
-        DockerFilesystemSpec filesystem = createFilesystem(createUserWorkspaceSpec(userId), runtimeStore);
+        DockerFilesystemSpec filesystem = createFilesystem(createUserWorkspaceSpec(), runtimeStore);
         Toolkit toolkit = createToolkit(configuration.isAdministrator());
         List<McpClientWrapper> mcpClients = registerMcpClients(toolkit, userId, configuration.getEnablement());
         SkillRuntimeWorkspace workspace = null;
@@ -293,6 +293,7 @@ public class HarnessAgentServiceImpl implements HarnessAgentService, AutoCloseab
         toolkit.registerTool(conversationFileTools.getObject());
         toolkit.registerTool(browserScreenshotTools.getObject());
         toolkit.registerTool(knowledgeLinkTools.getObject());
+        toolkit.registerTool(knowledgeSearchTools.getObject());
         toolkit.registerTool(agentScheduleTools.getObject());
         toolkit.registerTool(mcpServerTools.getObject());
         toolkit.registerTool(knowledgeLinkManagementTools.getObject());
@@ -322,6 +323,7 @@ public class HarnessAgentServiceImpl implements HarnessAgentService, AutoCloseab
                 .permissionContext(PermissionContextState.builder()
                         .mode(PermissionMode.BYPASS)
                         .build())
+                .middleware(tokenUsageMiddleware)
                 .middleware(toolAuthorizationMiddleware)
                 .middleware(subagentExecutionMiddleware)
                 .middleware(conversationFileMiddleware)
@@ -343,32 +345,35 @@ public class HarnessAgentServiceImpl implements HarnessAgentService, AutoCloseab
     }
 
     /**
-     * 全部注册完成后才保留成功客户端；中途终止时释放本批所有客户端，包括尚未注册的连接。
+     * 全部注册完成后才保留成功客户端；中途终止时释放未保留连接，避免重复关闭 SDK 已回收的失败连接。
      */
     private List<McpClientWrapper> registerMcpClients(Toolkit toolkit, String userId, ResourceEnablement enablement) {
         List<McpClientWrapper> clients = mcpRuntimeService.getVisibleClients(userId, enablement);
         Set<McpClientWrapper> retainedClients = new HashSet<>();
+        Set<McpClientWrapper> releasedClients = new HashSet<>();
         try {
             checkAgentCreationInterrupted();
             List<McpClientWrapper> registeredClients = clients.stream()
-                    .filter(client -> tryRegisterMcpClient(toolkit, client))
+                    .filter(client -> tryRegisterMcpClient(toolkit, client, releasedClients))
                     .toList();
             retainedClients.addAll(registeredClients);
             return registeredClients;
         } finally {
             clients.stream()
-                    .filter(client -> !retainedClients.contains(client))
+                    .filter(client -> !retainedClients.contains(client) && !releasedClients.contains(client))
                     .forEach(this::closeMcpClient);
         }
     }
 
     /**
-     * 单个 MCP 不可用时跳过，失败连接由注册批次统一回收。
+     * SDK 2.0.4 回收异步注册失败的连接；同步构造失败、未开始及成功后中断的连接仍由批次回收。
      */
-    private boolean tryRegisterMcpClient(Toolkit toolkit, McpClientWrapper client) {
+    private boolean tryRegisterMcpClient(Toolkit toolkit, McpClientWrapper client, Set<McpClientWrapper> releasedClients) {
         checkAgentCreationInterrupted();
         try {
-            toolkit.registerMcpClient(client).block();
+            toolkit.registerMcpClient(client)
+                    .doOnError(error -> releasedClients.add(client))
+                    .block();
             checkAgentCreationInterrupted();
             return true;
         } catch (RuntimeException error) {
@@ -390,29 +395,14 @@ public class HarnessAgentServiceImpl implements HarnessAgentService, AutoCloseab
     }
 
     /**
-     * 挂载公共只读知识库与个人知识库；Skill 仅由数据库授权快照投放。
+     * 文档知识通过 RAG 工具访问，沙箱只保留当前会话工作区。
      */
-    private WorkspaceSpec createUserWorkspaceSpec(String userId) {
-        BindMountEntry publicKnowledge = bindMount(agentProperties.getPublicKnowledge().getDirectory().toAbsolutePath().normalize(), true);
-        BindMountEntry userKnowledge = bindMount(userWorkspaceService.knowledgeDirectory(userId), false);
-
-        Map<String, WorkspaceEntry> entries = new LinkedHashMap<>();
-        entries.put(AgentConstant.PUBLIC_KNOWLEDGE_MOUNT_PATH, publicKnowledge);
-        entries.put(AgentConstant.USER_KNOWLEDGE_MOUNT_PATH, userKnowledge);
-
+    private WorkspaceSpec createUserWorkspaceSpec() {
         WorkspaceSpec workspaceSpec = new WorkspaceSpec();
         workspaceSpec.setRoot(agentProperties.getSandbox().getWorkspaceRoot());
-        workspaceSpec.setEntries(entries);
+        workspaceSpec.setEntries(Map.of());
         return workspaceSpec;
     }
-
-
-
-
-
-
-
-
 
     /**
      * 使用统一的 Docker 配置创建文件系统，并显式带上分布式快照和执行锁。
@@ -465,16 +455,6 @@ public class HarnessAgentServiceImpl implements HarnessAgentService, AutoCloseab
                 .flushTrigger(MemoryConfig.FlushTrigger.throttled(memory.getFlushMinGap()))
                 .consolidationMinGap(memory.getConsolidationMinGap())
                 .build();
-    }
-
-    /**
-     * 创建指向宿主机共享目录的 Sandbox Bind Mount。
-     */
-    private BindMountEntry bindMount(Path directory, boolean readOnly) {
-        BindMountEntry entry = new BindMountEntry();
-        entry.setHostPath(directory.toAbsolutePath().normalize().toString());
-        entry.setReadOnly(readOnly);
-        return entry;
     }
 
     /**

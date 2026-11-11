@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { TopRight } from '@element-plus/icons-vue';
 import { onMounted, ref } from 'vue';
 
 import { listAgentApps } from '@/api/agent-app';
@@ -25,10 +26,14 @@ onMounted(loadApplications);
 </script>
 
 <template>
-  <section class="apps-page">
-    <span class="apps-eyebrow">AGENT APPS</span>
-    <h1>智能应用</h1>
-    <p class="apps-intro">一点灵感，一次动手。打开一个应用，让 AI 成为你手边的小工具。</p>
+  <section class="workspace-page apps-page">
+    <header class="page-header">
+      <div>
+        <p>Agent apps</p>
+        <h1>智能应用</h1>
+        <span>打开应用，使用面向具体任务的工具</span>
+      </div>
+    </header>
     <p v-if="loading" role="status">正在加载应用…</p>
     <div v-else-if="error" role="alert" class="apps-error">
       {{ error }}
@@ -51,7 +56,7 @@ onMounted(loadApplications);
           <h2>
             <RouterLink v-if="hasApplicationPage(application.id)" :to="`/apps/${application.id}`" class="app-link">
               {{ application.name }}
-              <span class="app-arrow" aria-hidden="true">↗</span>
+              <el-icon class="app-arrow" aria-hidden="true"><TopRight /></el-icon>
             </RouterLink>
             <template v-else>{{ application.name }}</template>
           </h2>
@@ -60,84 +65,67 @@ onMounted(loadApplications);
         </div>
       </article>
     </div>
-    <p v-else>当前版本暂无可用应用。</p>
+    <p v-else>当前版本暂无可用应用</p>
   </section>
 </template>
 
 <style scoped>
 .apps-page {
-  padding: 42px;
-  overflow-y: auto;
-  height: 100%;
-}
-
-.apps-eyebrow {
-  color: var(--text-accent);
-  font-size: 11px;
-  letter-spacing: 3px;
-  font-weight: 700;
-}
-
-h1 {
-  font-size: 32px;
-  margin: 12px 0;
-  letter-spacing: -1px;
-}
-
-.apps-intro {
-  color: var(--text-soft);
-  margin-bottom: 36px;
-  line-height: 1.8;
+  min-width: 0;
 }
 
 .apps-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 380px));
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   gap: 24px;
+  width: min(var(--workspace-max-width), 100%);
+  margin: 0 auto;
 }
 
 .app-card {
   position: relative;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: 12px;
   overflow: hidden;
-  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+  transition: border-color 160ms var(--ease);
 }
 
 .app-card:has(.app-link:hover),
 .app-card:focus-within {
   border-color: var(--line-strong);
-  box-shadow: 0 10px 28px var(--shadow);
-  transform: translateY(-3px);
 }
 
 .app-art {
-  height: 184px;
+  height: 200px;
   background: var(--surface-soft);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 8px;
 }
 
-.color-art {
-  background: #e8eee4;
+.http-illustration {
+  width: 232px;
+  max-width: calc(100% - 32px);
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--primary);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-variant-numeric: tabular-nums;
 }
-
-.http-art { background: #e9eee9; }
-.http-illustration { width: 230px; padding: 22px; border: 1px solid #c4d2c5; border-radius: 12px; background: #f8faf7; color: #387361; font-family: monospace; }
 .http-illustration > span { font-size: 12px; }
-.http-illustration > strong { float: right; font-size: 15px; }
-.http-illustration svg { display: block; width: 100%; margin-top: 18px; }
-.http-illustration path { stroke: #387361; stroke-width: 2; fill: none; }
+.http-illustration > strong { float: right; font-size: 14px; font-weight: 500; }
+.http-illustration svg { display: block; width: 100%; margin-top: 16px; }
+.http-illustration path { stroke: currentColor; stroke-width: 1.5; fill: none; }
 
 .color-art span {
-  height: 106px;
-  width: 42px;
-  border-radius: 32px;
+  height: 104px;
+  width: 40px;
+  border-radius: 8px;
   transform: rotate(17deg);
-  box-shadow: 0 8px 16px #243d3012;
 }
 
 .color-art span:nth-child(even) {
@@ -154,7 +142,8 @@ h1 {
 }
 
 h2 {
-  font-size: 19px;
+  font-size: 20px;
+  font-weight: 500;
   margin: 0 0 12px;
 }
 
@@ -162,7 +151,7 @@ h2 {
   color: var(--text-soft);
   font-size: 13px;
   line-height: 1.8;
-  min-height: 47px;
+  min-height: 48px;
   margin: 0;
 }
 
@@ -179,7 +168,7 @@ h2 {
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 20px;
+  border-radius: 12px;
 }
 
 .app-link:focus-visible {
@@ -197,13 +186,12 @@ h2 {
   font-size: 20px;
   font-weight: 400;
   line-height: 1;
-  transition: color 180ms ease, transform 180ms ease;
+  transition: color 160ms var(--ease);
 }
 
 .app-link:hover .app-arrow,
 .app-link:focus-visible .app-arrow {
   color: var(--text-accent);
-  transform: translate(2px, -2px);
 }
 
 .unavailable {
@@ -219,20 +207,24 @@ h2 {
 
 .apps-error button {
   margin-left: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
   color: var(--text-accent);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.apps-error button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .app-card,
   .app-arrow {
     transition: none;
-    transform: none !important;
   }
 }
 
-@media (max-width: 760px) {
-  .apps-page {
-    padding: 68px 20px 28px;
-  }
-}
 </style>

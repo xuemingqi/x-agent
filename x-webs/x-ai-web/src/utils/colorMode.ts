@@ -5,8 +5,8 @@ export type ColorMode = 'light' | 'dark';
 const COLOR_MODE_STORAGE_KEY = 'x-ai-color-mode';
 const DARK_MODE_MEDIA_QUERY = '(prefers-color-scheme: dark)';
 const THEME_COLORS: Record<ColorMode, string> = {
-  light: '#f7f8fc',
-  dark: '#0b0d12',
+  light: '#f8f9fb',
+  dark: '#15171b',
 };
 
 const activeColorMode = ref<ColorMode>('dark');

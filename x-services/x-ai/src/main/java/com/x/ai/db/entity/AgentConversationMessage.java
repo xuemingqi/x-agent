@@ -58,6 +58,12 @@ public class AgentConversationMessage {
     private String toolCallId;
 
     /**
+     * 本轮模型累计用量 JSON；历史消息可为空。
+     */
+    @TableField("token_usage")
+    private String tokenUsage;
+
+    /**
      * 创建时间
      */
     @TableField(value = "create_time", insertStrategy = FieldStrategy.NEVER, updateStrategy = FieldStrategy.NEVER)

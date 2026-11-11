@@ -25,4 +25,28 @@ public class KnowledgeDocumentDo {
 
     @Schema(name = "updateTime", description = "文档更新时间")
     private LocalDateTime updateTime;
+
+    /**
+     * 索引状态：INDEXING、READY、FAILED。
+     */
+    @Schema(name = "status", description = "文档索引状态", allowableValues = {"INDEXING", "READY", "FAILED"})
+    private String status;
+
+    /**
+     * 已成功发布的文档切片总数。
+     */
+    @Schema(name = "chunkCount", description = "已成功发布的切片总数", minimum = "0")
+    private int chunkCount;
+
+    /**
+     * 索引使用的向量模型，尚未成功索引时为空字符串。
+     */
+    @Schema(name = "embeddingModel", description = "索引使用的向量模型，尚未成功索引时为空字符串")
+    private String embeddingModel;
+
+    /**
+     * 可向用户展示的索引失败原因，成功时为空。
+     */
+    @Schema(name = "errorMessage", description = "索引失败原因，成功时为空")
+    private String errorMessage;
 }

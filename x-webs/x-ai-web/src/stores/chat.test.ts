@@ -7,7 +7,7 @@ import { completeBrowserScreenshot, interruptTask, streamChat } from '@/api/chat
 import { captureBrowserScreenshot, supportsBrowserScreenshot } from '@/utils/browser-screenshot';
 import { deletePendingConversationFile, uploadConversationFiles } from '@/api/conversation-file';
 import { useChatStore } from './chat';
-import type { AgentEvent, Conversation, ConversationFile } from '@/types/chat';
+import type { AgentEvent, Conversation, ConversationFile, TokenUsage } from '@/types/chat';
 
 vi.mock('@/api/chat', () => ({
   interruptTask: vi.fn(),
@@ -50,6 +50,32 @@ describe('chat store', () => {
     vi.mocked(interruptTask).mockResolvedValue({ accepted: true });
     vi.mocked(supportsBrowserScreenshot).mockReturnValue(true);
     vi.mocked(completeBrowserScreenshot).mockResolvedValue(true);
+  });
+
+  it('replaces cumulative token snapshots without double counting and restores them from history', async () => {
+    const streams = captureStreams();
+    const chat = await openChat();
+    const sending = chat.send('查询资料');
+    const usage: TokenUsage = {
+      inputTokens: 150, outputTokens: 50, totalTokens: 200, cachedTokens: 30,
+      cacheCreationTokens: 10, reasoningTokens: 20, toolUsePromptTokens: 15, modelCalls: 2, timeSeconds: 0.75,
+    };
+    streams[0].onEvent(agentEvent('token_usage', 'session-1', { usage }));
+    streams[0].onEvent(agentEvent('token_usage', 'session-1', { usage }));
+    streams[0].onEvent(agentEvent('agent_result', 'session-1', { text: '已找到资料' }));
+    streams[0].finish();
+    await sending;
+    expect(chat.messages.find((message) => message.role === 'ASSISTANT')?.usage).toEqual(usage);
+
+    vi.mocked(getConversation).mockResolvedValue({
+      ...emptyConversation('history'),
+      messages: [
+        { id: '1', parentId: null, role: 'USER', content: '查询资料', toolCallId: null, createdAt: null },
+        { id: '2', parentId: '1', role: 'ASSISTANT', content: '已找到资料', toolCallId: null, createdAt: null, usage },
+      ],
+    });
+    await chat.openConversation('history');
+    expect(chat.messages.find((message) => message.role === 'ASSISTANT')?.usage).toEqual(usage);
   });
 
   it('never drains a previous login queue after the store is reset', async () => {

@@ -111,9 +111,9 @@ async function removeConversation(sessionId: string): Promise<void> {
 
 <template>
   <div v-if="mobileOpen" class="sidebar-mask" @click="emit('close')" />
-  <aside class="app-sidebar" :class="{ 'is-mobile-open': mobileOpen }">
+  <aside id="app-navigation" class="app-sidebar" :class="{ 'is-mobile-open': mobileOpen }">
     <div class="brand-row">
-      <div class="brand-mark">A</div>
+      <div class="brand-mark agent-mark" aria-hidden="true" />
       <div class="brand-copy">
         <strong>X Agent</strong>
         <span>智能工作台</span>
@@ -139,10 +139,9 @@ async function removeConversation(sessionId: string): Promise<void> {
     <button class="new-chat-button" @click="newChat">
       <el-icon><Plus /></el-icon>
       <span>新建对话</span>
-      <kbd>⌘ N</kbd>
     </button>
 
-    <nav class="primary-nav">
+    <nav class="primary-nav" aria-label="主导航">
       <RouterLink to="/chat" :class="{ active: isChatPage }" @click="emit('close')">
         <el-icon><ChatDotRound /></el-icon>
         <span>对话</span>
@@ -187,7 +186,7 @@ async function removeConversation(sessionId: string): Promise<void> {
           </el-icon>
         </button>
       </div>
-      <div v-else class="conversation-empty">开始一次新的对话吧</div>
+      <div v-else class="conversation-empty">暂无对话记录</div>
     </section>
 
     <el-popover

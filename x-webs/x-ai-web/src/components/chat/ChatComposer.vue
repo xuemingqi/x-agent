@@ -456,7 +456,7 @@ function formatSize(sizeBytes: number): string {
           rows="2"
           :disabled="!composerModelId || !modelConfigured || loading || editDisabled"
           :aria-label="editingMessage ? '编辑待发送消息内容' : '消息内容'"
-          :placeholder="!modelConfigured ? '请先配置个人模型' : editingMessage ? '修改这条待发送消息…' : selectedSkill ? '描述要交给该 Skill 执行的任务…' : '分配任务或提出任何问题，输入 / 调用 Skill…'"
+          :placeholder="!modelConfigured ? '请先配置个人模型' : editingMessage ? '修改这条待发送消息…' : selectedSkill ? '描述要交给该 Skill 执行的任务…' : '描述任务，或输入 / 调用 Skill'"
           @input="skillMenuDismissed = false"
           @blur="skillMenuDismissed = true"
           @compositionstart="isComposing = true"
@@ -520,7 +520,7 @@ function formatSize(sizeBytes: number): string {
         </button>
       </div>
     </div>
-    <p>Agent 可能会犯错，请核对重要信息。</p>
+    <p>请核对 Agent 返回的重要信息</p>
   </div>
 </template>
 

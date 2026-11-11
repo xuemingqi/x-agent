@@ -33,6 +33,8 @@ public enum AgentEventType {
 
     TOOL_RESULT_TEXT_DELTA("tool_result_text_delta", "工具结果文本增量"),
 
+    TOKEN_USAGE("token_usage", "本轮模型用量"),
+
     AGENT_RESULT("agent_result", "Agent 最终结果"),
 
     AGENT_END("agent_end", "Agent 结束"),

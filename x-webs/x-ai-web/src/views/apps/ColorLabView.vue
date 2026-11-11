@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ArrowLeft, Check, Close, Download, Warning } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import { computed, onBeforeUnmount, ref } from 'vue';
 
@@ -9,6 +10,7 @@ import { COLOR_ROLES, type ColorRole, type ColorTheme, type ColorThemeGenerateRe
 import { copyTheme, exportThemeCss, INITIAL_COLOR_THEME, isHexColor, paletteContrast } from '@/utils/color-theme';
 
 const modelSetting = useModelSettingStore();
+const controlTab = ref<'generate' | 'palette'>('generate');
 const prompt = ref('雨后的森林，安静、清新，带一点温暖');
 const modelId = ref('');
 const dark = ref(false);
@@ -103,28 +105,34 @@ function downloadCss(): void {
   <section class="color-lab">
     <header class="lab-header">
       <div>
-        <RouterLink to="/apps" class="back-link">← 智能应用</RouterLink>
+        <RouterLink to="/apps" class="back-link"><el-icon><ArrowLeft /></el-icon>智能应用</RouterLink>
         <h1>
           AI 配色实验室
-          <span>BETA</span>
         </h1>
-        <p>从一句灵感，到一套看得见、摸得着的界面配色。</p>
+        <p>描述配色方向，调整色板并检查界面中的文字对比度</p>
       </div>
       <div class="export-actions">
         <button type="button" @click="copyCss">复制 CSS</button>
-        <button type="button" @click="downloadCss">下载 CSS ↗</button>
+        <button type="button" @click="downloadCss"><el-icon><Download /></el-icon>下载 CSS</button>
       </div>
     </header>
     <div class="lab-workbench">
       <aside class="lab-controls">
-        <form class="control-panel" @submit.prevent="generate(false)">
+        <div class="control-tabs" role="tablist" aria-label="配色调整方式">
+          <button id="color-generation-tab" type="button" role="tab" aria-controls="color-generation-panel"
+            :aria-selected="controlTab === 'generate'" @click="controlTab = 'generate'">生成配色</button>
+          <button id="color-palette-tab" type="button" role="tab" aria-controls="color-palette-panel"
+            :aria-selected="controlTab === 'palette'" @click="controlTab = 'palette'">微调色板</button>
+        </div>
+        <form v-show="controlTab === 'generate'" id="color-generation-panel" class="control-panel"
+          role="tabpanel" aria-labelledby="color-generation-tab" @submit.prevent="generate(false)">
           <fieldset :disabled="pending">
             <div class="panel-heading">
               <h2>
                 01
                 <span>写下你的灵感</span>
               </h2>
-              <span class="tiny-label">IDEA</span>
+              <span class="tiny-label">灵感</span>
             </div>
             <label class="sr-only" for="color-prompt">配色灵感</label>
             <textarea
@@ -165,7 +173,7 @@ function downloadCss(): void {
               :disabled="allLocked || !prompt.trim()"
               data-testid="generate"
             >
-              {{ pending ? '正在调配颜色…' : '✦ 生成新配色' }}
+              {{ pending ? '正在调配颜色…' : '生成新配色' }}
             </button>
           </fieldset>
           <p v-if="pending" class="control-hint" role="status">正在用你的模型生成方案，请稍候…</p>
@@ -177,7 +185,7 @@ function downloadCss(): void {
             当前方案已保留，可以重新生成。
           </p>
         </form>
-        <div class="control-panel palette-panel">
+        <div v-show="controlTab === 'palette'" id="color-palette-panel" class="control-panel palette-panel" role="tabpanel" aria-labelledby="color-palette-tab">
           <div class="panel-heading">
             <h2>
               02
@@ -240,7 +248,7 @@ function downloadCss(): void {
           <article v-if="baseline" class="theme-frame">
             <div class="theme-caption">
               <span>对比 · {{ baseline.name }}</span>
-              <button type="button" aria-label="关闭方案对比" @click="baseline = undefined">×</button>
+              <button type="button" aria-label="关闭方案对比" @click="baseline = undefined"><el-icon><Close /></el-icon></button>
             </div>
             <ColorThemePreview :theme="baseline" compact />
           </article>
@@ -280,7 +288,7 @@ function downloadCss(): void {
               data-testid="improve"
               @click="generate(true)"
             >
-              ✦ 优化可读性
+              优化可读性
             </button>
           </div>
           <div class="contrast-checks">
@@ -289,7 +297,7 @@ function downloadCss(): void {
               <strong>
                 {{ item.ratio.toFixed(2) }}
                 :1
-                <span>{{ item.passes ? '✓' : '!' }}</span>
+                <el-icon :aria-label="item.passes ? '达标' : '待调整'"><Check v-if="item.passes" /><Warning v-else /></el-icon>
               </strong>
             </div>
           </div>
@@ -326,7 +334,7 @@ function downloadCss(): void {
 
 <style scoped>
 .color-lab {
-  padding: 28px 32px 44px;
+  padding: var(--workspace-gutter);
   overflow-y: auto;
   height: 100%;
 }
@@ -336,10 +344,14 @@ function downloadCss(): void {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 28px;
+  margin: 0 auto 24px;
+  width: min(var(--workspace-max-width), 100%);
 }
 
 .back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: 12px;
   color: var(--text-muted);
   text-decoration: none;
@@ -353,18 +365,8 @@ h1 {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 25px;
-  margin: 15px 0 9px;
-  letter-spacing: -.7px;
-}
-
-h1 span {
-  border: 1px solid var(--primary-border);
-  color: var(--text-accent);
-  border-radius: 5px;
-  padding: 3px 6px;
-  font-size: 9px;
-  letter-spacing: 1px;
+  font-size: 28px;
+  margin: 12px 0 8px;
   font-weight: 500;
 }
 
@@ -377,7 +379,7 @@ h1 span {
 button {
   cursor: pointer;
   font: inherit;
-  transition: background .15s, border-color .15s;
+  transition: background-color 160ms var(--ease), border-color 160ms var(--ease), color 160ms var(--ease);
 }
 
 button:disabled {
@@ -385,9 +387,9 @@ button:disabled {
   opacity: .55;
 }
 
-button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible, summary:focus-visible {
   outline: 2px solid var(--primary);
-  outline-offset: 3px;
+  outline-offset: 2px;
 }
 
 .export-actions {
@@ -401,7 +403,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   background: var(--surface);
   color: var(--text-soft);
   border-radius: 8px;
-  padding: 9px 12px;
+  padding: 8px 12px;
   font-size: 11px;
 }
 
@@ -414,20 +416,58 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
   gap: 24px;
-  max-width: 1520px;
+  width: min(var(--workspace-max-width), 100%);
+  margin: 0 auto;
+  align-items: start;
 }
 
 .lab-controls {
+  position: sticky;
+  top: 0;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  min-width: 0;
+}
+
+.control-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+  background: var(--surface);
+}
+
+.control-tabs button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text-muted);
+  background: transparent;
+  font-size: 13px;
+}
+
+.control-tabs button[aria-selected='true'] {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.lab-controls .control-panel {
+  border-radius: 0 0 12px 12px;
+}
+
+.export-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .control-panel {
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--surface);
-  padding: 18px;
+  padding: 20px;
 }
 
 fieldset {
@@ -442,7 +482,7 @@ fieldset {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  margin-bottom: 17px;
+  margin-bottom: 16px;
 }
 
 h2 {
@@ -452,34 +492,33 @@ h2 {
 
 .panel-heading h2 {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
 }
 
 .panel-heading h2 span {
   color: var(--text);
-  margin-left: 7px;
+  margin-left: 8px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .tiny-label {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-muted);
-  letter-spacing: .5px;
 }
 
 textarea {
   display: block;
   resize: vertical;
-  min-height: 82px;
+  min-height: 84px;
   max-height: 220px;
   width: 100%;
   padding: 12px;
   background: var(--field-bg);
   color: var(--text);
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 8px;
   font: inherit;
   font-size: 12px;
   line-height: 1.8;
@@ -488,17 +527,17 @@ textarea {
 .preset-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin: 10px 0 20px;
+  gap: 8px;
+  margin: 12px 0 20px;
 }
 
 .preset-list button {
   border: 1px solid var(--line-soft);
   background: var(--surface-soft);
   color: var(--text-soft);
-  border-radius: 6px;
-  padding: 5px 7px;
-  font-size: 9px;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 11px;
 }
 
 .preset-list button:hover {
@@ -509,15 +548,15 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 11px 0;
+  margin: 12px 0;
   font-size: 11px;
   color: var(--text-soft);
 }
 
 .segmented {
   display: flex;
-  border-radius: 7px;
-  padding: 3px;
+  border-radius: 8px;
+  padding: 4px;
   background: var(--surface-soft);
 }
 
@@ -525,22 +564,21 @@ textarea {
   border: 0;
   background: transparent;
   color: var(--text-soft);
-  padding: 5px 18px;
+  padding: 4px 16px;
   font-size: 11px;
-  border-radius: 5px;
+  border-radius: 4px;
 }
 
 .segmented .selected {
   color: var(--text-accent);
   background: var(--surface);
-  box-shadow: 0 1px 4px var(--shadow);
 }
 
 .model-label {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   display: block;
-  margin: 18px 0 7px;
+  margin: 20px 0 8px;
 }
 
 select {
@@ -549,38 +587,42 @@ select {
   border: 1px solid var(--line);
   color: var(--text-soft);
   background: var(--field-bg);
-  border-radius: 7px;
-  padding: 9px;
+  border-radius: 8px;
+  padding: 8px;
   font-size: 11px;
 }
 
 .generate-button {
-  background: var(--primary);
-  color: var(--send-button-text);
+  background: var(--button-bg);
+  color: var(--button-text);
   width: 100%;
   border: 0;
   border-radius: 8px;
-  padding: 11px;
+  padding: 12px;
   font-size: 12px;
-  margin-top: 14px;
+  margin-top: 16px;
+}
+
+.generate-button:hover:not(:disabled) {
+  background: var(--button-hover);
 }
 
 .control-hint, .panel-hint {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.7;
-  margin: 10px 0 0;
+  margin: 12px 0 0;
 }
 
 .panel-hint {
-  margin: -6px 0 12px;
+  margin: -4px 0 12px;
 }
 
 .generation-error {
   background: var(--danger-soft);
   color: var(--danger-text);
-  border-radius: 7px;
-  padding: 10px;
+  border-radius: 8px;
+  padding: 12px;
   line-height: 1.8;
   font-size: 11px;
 }
@@ -588,8 +630,8 @@ select {
 .color-row {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 9px 0;
+  gap: 8px;
+  padding: 8px 0;
   border-bottom: 1px solid var(--line-faint);
 }
 
@@ -599,15 +641,15 @@ select {
 }
 
 .color-row label {
-  font-size: 10px;
+  font-size: 11px;
   flex: 1;
   white-space: nowrap;
   color: var(--text-soft);
 }
 
 .color-picker {
-  width: 25px;
-  height: 25px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: none;
   background: transparent;
@@ -621,17 +663,17 @@ select {
 
 .color-picker::-webkit-color-swatch {
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 4px;
 }
 
 .hex-input {
-  width: 69px;
+  width: 76px;
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-soft);
-  font: 10px ui-monospace, monospace;
+  font: 11px ui-monospace, monospace;
   padding: 4px 0;
-  border-radius: 3px;
+  border-radius: 4px;
 }
 
 .hex-input:focus {
@@ -640,19 +682,19 @@ select {
 
 .lock-button {
   padding: 4px;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 4px;
   background: transparent;
   color: var(--text-muted);
 }
 
 .lock-button svg {
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
   stroke: currentColor;
-  stroke-width: 1.3;
+  stroke-width: 1.5;
 }
 
 .lock-button.locked {
@@ -687,16 +729,16 @@ select {
 }
 
 .source-tag {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-muted);
   background: var(--surface-soft);
-  padding: 4px 6px;
+  padding: 4px 8px;
   border-radius: 4px;
 }
 
 .preview-heading button {
-  font-size: 10px;
-  padding: 7px 10px;
+  font-size: 11px;
+  padding: 8px 12px;
 }
 
 .preview-grid.comparing {
@@ -710,7 +752,7 @@ select {
 }
 
 .theme-caption {
-  height: 30px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -729,7 +771,7 @@ select {
   display: flex;
   justify-content: space-between;
   gap: 20px;
-  padding: 19px 3px 23px;
+  padding: 20px 0 24px;
   align-items: center;
 }
 
@@ -751,23 +793,23 @@ select {
 }
 
 .mini-palette i {
-  width: 15px;
+  width: 16px;
   height: 28px;
 }
 
 .mini-palette i:first-child {
-  border-radius: 5px 0 0 5px;
+  border-radius: 4px 0 0 4px;
 }
 
 .mini-palette i:last-child {
-  border-radius: 0 5px 5px 0;
+  border-radius: 0 4px 4px 0;
 }
 
 .contrast-panel {
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 14px;
   background: var(--surface);
-  padding: 18px;
+  padding: 20px;
 }
 
 .contrast-heading {
@@ -779,7 +821,7 @@ select {
 
 .contrast-heading h2 span {
   color: var(--success-text);
-  font-size: 10px;
+  font-size: 11px;
   margin-left: 8px;
   font-weight: 500;
 }
@@ -789,41 +831,41 @@ select {
 }
 
 .contrast-heading p {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
-  margin: 7px 0 0;
+  margin: 8px 0 0;
 }
 
 .contrast-heading button {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-accent);
   flex-shrink: 0;
 }
 
 .contrast-checks {
-  margin-top: 15px;
+  margin-top: 16px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
-  gap: 7px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
 }
 
 .contrast-checks > div {
-  padding: 10px;
-  border-radius: 7px;
+  padding: 12px;
+  border-radius: 8px;
   background: var(--surface-soft);
-  font-size: 9px;
+  font-size: 11px;
   color: var(--text-soft);
 }
 
 .contrast-checks strong {
   display: block;
-  margin-top: 7px;
+  margin-top: 8px;
   color: var(--success-text);
   font-size: 12px;
   font-weight: 500;
 }
 
-.contrast-checks strong span {
+.contrast-checks strong .el-icon {
   float: right;
 }
 
@@ -832,7 +874,7 @@ select {
 }
 
 .contrast-note {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--warning-text);
   line-height: 1.8;
   margin: 12px 0 0;
@@ -851,18 +893,18 @@ select {
 
 .history-heading > span {
   color: var(--text-muted);
-  font-size: 9px;
+  font-size: 11px;
 }
 
 .history-list {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   overflow-x: auto;
   padding-bottom: 8px;
 }
 
 .history-list button {
-  flex: 0 0 115px;
+  flex: 0 0 120px;
   padding: 0;
   text-align: left;
   border: 1px solid var(--line);
@@ -870,12 +912,12 @@ select {
   background: var(--surface);
   color: var(--text-soft);
   overflow: hidden;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .history-list button > span:last-child {
   display: block;
-  padding: 9px;
+  padding: 8px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -883,7 +925,7 @@ select {
 
 .history-colors {
   display: flex;
-  height: 31px;
+  height: 32px;
 }
 
 .history-colors i {
@@ -903,7 +945,7 @@ select {
 .css-panel pre {
   color: var(--text-code);
   background: var(--code-block-bg);
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 16px;
   line-height: 1.8;
   overflow-x: auto;
@@ -918,82 +960,27 @@ select {
   white-space: nowrap;
 }
 
-@media (min-width: 1700px) {
-  .color-lab {
-    padding-left: 48px;
-    padding-right: 48px;
-  }
-  .lab-workbench {
-    grid-template-columns: 300px minmax(0, 1fr);
-    gap: 30px;
-  }
+@container workspace (max-width: 1120px) {
+  .preview-grid.comparing { grid-template-columns: 1fr; }
+  .contrast-heading { align-items: flex-start; flex-wrap: wrap; }
+  .theme-summary { gap: 12px; }
+  .mini-palette { display: none; }
 }
 
-@media (max-width: 1160px) {
-  .color-lab {
-    padding: 24px;
-  }
-  .lab-workbench {
-    grid-template-columns: 250px minmax(0, 1fr);
-    gap: 16px;
-  }
-  .control-panel {
-    padding: 14px;
-  }
-  .color-row {
-    gap: 6px;
-  }
-  .preview-grid.comparing {
-    grid-template-columns: 1fr;
-  }
-  .contrast-heading {
-    align-items: flex-start;
-  }
-  .theme-summary {
-    gap: 12px;
-  }
-  .mini-palette {
-    display: none;
-  }
-}
-
-@media (max-width: 900px) {
-  .lab-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-  .lab-workbench {
-    grid-template-columns: 1fr;
-  }
-  .lab-controls {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    align-items: start;
-  }
+@container workspace (max-width: 840px) {
+  .lab-workbench { grid-template-columns: 1fr; }
+  .lab-controls { position: static; }
+  .lab-header { align-items: flex-start; flex-wrap: wrap; }
 }
 
 @media (max-width: 760px) {
-  .color-lab {
-    padding-top: 68px;
-  }
+  .color-lab { padding: 72px 16px 24px; }
+  .lab-header { align-items: flex-start; flex-direction: column; gap: 16px; }
+  .lab-header h1 { font-size: 28px; }
+  .theme-summary { padding: 20px 0; }
 }
 
-@media (max-width: 600px) {
-  .color-lab {
-    padding: 68px 16px 24px;
-  }
-  .lab-controls {
-    display: flex;
-    align-items: stretch;
-  }
-  .lab-header h1 {
-    font-size: 23px;
-  }
-  .contrast-heading {
-    flex-wrap: wrap;
-  }
-  .theme-summary {
-    padding: 18px 0;
-  }
+@media (prefers-reduced-motion: reduce) {
+  button { transition: none; }
 }
 </style>

@@ -41,6 +41,28 @@ function button(container: HTMLElement, selector: string): HTMLButtonElement {
 }
 
 describe('color lab interactions', () => {
+  it('switches controls without losing edited colors or locking state', async () => {
+    const { container } = await mountView();
+    button(container, '[aria-controls="color-palette-panel"]').click();
+    await settle();
+    const palette = container.querySelector<HTMLElement>('#color-palette-panel')!;
+    expect(palette.style.display).not.toBe('none');
+    expect(container.querySelector<HTMLElement>('#color-generation-panel')!.style.display).toBe('none');
+    const input = container.querySelector<HTMLInputElement>('#hex-primary')!;
+    input.value = '#123456';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    button(container, '[aria-label="锁定主题色"]').click();
+    await settle();
+
+    button(container, '[aria-controls="color-generation-panel"]').click();
+    await settle();
+    button(container, '[aria-controls="color-palette-panel"]').click();
+    await settle();
+
+    expect(input.value).toBe('#123456');
+    expect(button(container, '[aria-label="解锁主题色"]').getAttribute('aria-pressed')).toBe('true');
+  });
+
   it('uses the current edited colors as lock constraints and avoids duplicate generation', async () => {
     let resolve!: (theme: ColorTheme) => void;
     vi.mocked(generateColorTheme).mockReturnValue(new Promise((done) => { resolve = done; }));

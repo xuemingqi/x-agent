@@ -14,6 +14,19 @@ const cleanups: (() => void)[] = [];
 afterEach(() => cleanups.splice(0).forEach((cleanup) => cleanup()));
 
 describe('ChatMessage screenshot timeline', () => {
+  it('shows total usage and expandable provider details without affecting the message timeline', async () => {
+    const { message, container } = mountMessage();
+    message.usage = {
+      inputTokens: 150, outputTokens: 50, totalTokens: 200, cachedTokens: 30,
+      cacheCreationTokens: 10, reasoningTokens: 20, toolUsePromptTokens: 15, modelCalls: 2, timeSeconds: 0.75,
+    };
+    await nextTick();
+    expect(container.querySelector('.token-usage summary')?.textContent).toContain('200 tokens');
+    expect(container.querySelector('.token-usage')?.textContent).toContain('细分项已包含在输入或输出总量中');
+    expect(container.querySelector('.token-usage')?.textContent).toContain('工具结果输入');
+    expect(container.querySelector('.assistant-response .token-usage')).toBeNull();
+  });
+
   it('keeps consent visible at its original position while later content streams below it', async () => {
     const { message, container } = mountMessage();
     const request = container.querySelector('.screenshot-card')!;

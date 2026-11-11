@@ -5,6 +5,8 @@ import com.x.framework.common.utils.UserThreadLocalUtil;
 import cn.hutool.core.lang.Snowflake;
 import com.x.ai.common.domain.ConversationDo;
 import com.x.ai.common.domain.ConversationMessageDo;
+import com.x.ai.common.domain.TokenUsageDo;
+import com.x.framework.common.utils.JsonUtil;
 import com.x.ai.db.entity.AgentConversation;
 import com.x.ai.db.entity.AgentConversationMessage;
 import com.x.ai.db.enums.ConversationMessageRole;
@@ -156,7 +158,8 @@ public class ConversationServiceImpl implements ConversationService {
                 .setUserId(userId)
                 .setRole(message.getRole())
                 .setContent(message.getContent())
-                .setToolCallId(message.getToolCallId()));
+                .setToolCallId(message.getToolCallId())
+                .setTokenUsage(message.getUsage() == null ? null : JsonUtil.toJsonStrOrThrow(message.getUsage())));
         return messageId;
     }
 
@@ -213,6 +216,8 @@ public class ConversationServiceImpl implements ConversationService {
                 .setRole(message.getRole())
                 .setContent(message.getContent())
                 .setToolCallId(message.getToolCallId())
+                .setUsage(message.getTokenUsage() == null ? null
+                        : JsonUtil.OBJECT_MAPPER.readValue(message.getTokenUsage(), TokenUsageDo.class))
                 .setCreatedAt(message.getCreateTime() == null ? null : message.getCreateTime().toString());
     }
 

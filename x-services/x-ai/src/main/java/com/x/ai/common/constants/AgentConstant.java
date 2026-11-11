@@ -77,16 +77,6 @@ public interface AgentConstant {
             + CONVERSATION_FILE_OUTPUT_DIRECTORY + StrPool.SLASH;
 
     /**
-     * 平台公共知识库在沙箱工作区中的挂载路径。
-     */
-    String PUBLIC_KNOWLEDGE_MOUNT_PATH = "shared-knowledge/public";
-
-    /**
-     * 用户知识库在沙箱工作区中的挂载路径。
-     */
-    String USER_KNOWLEDGE_MOUNT_PATH = "shared-knowledge/user";
-
-    /**
      * 共享 Skill 的发送人手机号元数据键。
      */
     String SHARED_SKILL_SENDER_MOBILE_METADATA = "sharedByMobile";

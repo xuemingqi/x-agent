@@ -74,18 +74,6 @@ public class AgentProperties {
     private Skill skill = new Skill();
 
     /**
-     * 公共知识库配置。
-     */
-    @Valid
-    private PublicKnowledge publicKnowledge = new PublicKnowledge();
-
-    /**
-     * 用户工作区共享目录配置。
-     */
-    @Valid
-    private UserWorkspace userWorkspace = new UserWorkspace();
-
-    /**
      * 会话文件配置。
      */
     @Valid
@@ -240,30 +228,6 @@ public class AgentProperties {
          */
         @NotBlank
         private String resourceTableName = "agent_public_skill_resource";
-    }
-
-    @Data
-    public static class PublicKnowledge {
-        /**
-         * Docker 宿主机上的公共知识库目录。
-         */
-        @NotNull
-        private Path directory = Path.of(".agentscope/public-knowledge");
-    }
-
-    @Data
-    public static class UserWorkspace {
-        /**
-         * Docker 宿主机上的用户共享目录，生产环境应指向 NFS 等共享文件系统挂载点。
-         */
-        @NotNull
-        private Path directory = Path.of(".agentscope/user-workspaces");
-
-        /**
-         * 单个知识库文件允许上传的最大字节数。
-         */
-        @Min(1)
-        private long maxUploadSizeBytes = 104_857_600L;
     }
 
     @Data

@@ -25,6 +25,12 @@ public class ConversationMessageDo {
     @Schema(name = "toolCallId", description = "工具调用 ID")
     private String toolCallId;
 
+    /**
+     * 本轮主 Agent 和子 Agent 的累计模型用量，历史消息可为空。
+     */
+    @Schema(name = "usage", description = "本轮主 Agent 和子 Agent 的累计模型用量，历史消息可为空")
+    private TokenUsageDo usage;
+
     @Schema(name = "createdAt", description = "消息创建时间")
     private String createdAt;
 }

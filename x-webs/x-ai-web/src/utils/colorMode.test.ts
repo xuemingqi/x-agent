@@ -40,7 +40,7 @@ describe('color mode', () => {
     expect(currentColorMode.value).toBe('light');
     expect(classListToggle).toHaveBeenCalledWith('dark', false);
     expect(rootDataset.theme).toBe('light');
-    expect(themeColorSetAttribute).toHaveBeenCalledWith('content', '#f7f8fc');
+    expect(themeColorSetAttribute).toHaveBeenCalledWith('content', '#f8f9fb');
     expect(storageSetItem).not.toHaveBeenCalled();
   });
 
@@ -54,7 +54,7 @@ describe('color mode', () => {
     expect(currentColorMode.value).toBe('dark');
     expect(classListToggle).toHaveBeenCalledWith('dark', true);
     expect(rootDataset.theme).toBe('dark');
-    expect(themeColorSetAttribute).toHaveBeenCalledWith('content', '#0b0d12');
+    expect(themeColorSetAttribute).toHaveBeenCalledWith('content', '#15171b');
     expect(storageSetItem).not.toHaveBeenCalled();
   });
 
@@ -71,6 +71,6 @@ describe('color mode', () => {
     expect(storageSetItem).toHaveBeenCalledWith('x-ai-color-mode', 'light');
     expect(classListToggle).toHaveBeenCalledWith('dark', false);
     expect(rootDataset.theme).toBe('light');
-    expect(themeColorSetAttribute).toHaveBeenCalledWith('content', '#f7f8fc');
+    expect(themeColorSetAttribute).toHaveBeenCalledWith('content', '#f8f9fb');
   });
 });

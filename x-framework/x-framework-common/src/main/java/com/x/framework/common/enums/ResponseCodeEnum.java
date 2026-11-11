@@ -67,6 +67,8 @@ public enum ResponseCodeEnum {
     AGENT_KNOWLEDGE_INVALID(HttpStatus.BAD_REQUEST, 15031, "知识库文件无效！"),
     AGENT_KNOWLEDGE_NOT_FOUND(HttpStatus.NOT_FOUND, 15032, "知识库文件不存在！"),
     AGENT_KNOWLEDGE_STORAGE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, 15033, "知识库文件操作失败！"),
+    AGENT_KNOWLEDGE_INDEX_ERROR(HttpStatus.SERVICE_UNAVAILABLE, 15034, "知识库索引失败，请检查文档内容、向量模型及数据库配置！"),
+    AGENT_KNOWLEDGE_SEARCH_INVALID(HttpStatus.BAD_REQUEST, 15035, "请输入有效检索内容，结果数应为 1 到 20！"),
     AGENT_SKILL_INVALID(HttpStatus.BAD_REQUEST, 15040, "Skill 配置无效！"),
     AGENT_SKILL_NOT_FOUND(HttpStatus.NOT_FOUND, 15041, "Skill 不存在！"),
     AGENT_SKILL_CONFLICT(HttpStatus.CONFLICT, 15042, "Skill 已存在！"),

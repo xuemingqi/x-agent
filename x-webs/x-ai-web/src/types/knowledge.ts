@@ -1,9 +1,46 @@
+export type KnowledgeScope = 'user' | 'public';
+
+export type KnowledgeIndexStatus = 'UNINDEXED' | 'INDEXING' | 'READY' | 'FAILED';
+
 export interface KnowledgeDocument {
   path: string;
   name: string;
   size: number;
   contentType: string;
   updateTime: string;
+  status: KnowledgeIndexStatus;
+  chunkCount: number;
+  embeddingModel: string | null;
+  errorMessage: string | null;
+}
+
+export interface KnowledgePreview {
+  path: string;
+  name: string;
+  content: string;
+  contentType: string;
+}
+
+export interface KnowledgeChunk {
+  index: number;
+  content: string;
+  characterCount: number;
+}
+
+export interface KnowledgeChunkPage {
+  items: KnowledgeChunk[];
+  total: number;
+  page: number;
+  size: number;
+}
+
+export interface KnowledgeSearchResult {
+  path: string;
+  name: string;
+  chunkIndex: number;
+  content: string;
+  score: number;
+  scope: KnowledgeScope;
 }
 
 export const KNOWLEDGE_LINK_SCOPE = {

@@ -22,12 +22,25 @@ export interface ConversationFile {
   createdAt: string | null;
 }
 
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  cachedTokens: number;
+  cacheCreationTokens: number;
+  reasoningTokens: number;
+  toolUsePromptTokens: number;
+  modelCalls: number;
+  timeSeconds: number;
+}
+
 export interface ConversationMessage {
   id: string;
   parentId: string | null;
   role: MessageRole;
   content: string;
   toolCallId: string | null;
+  usage?: TokenUsage | null;
   createdAt: string | null;
 }
 

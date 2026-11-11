@@ -358,7 +358,7 @@ watch(() => props.publicMode, () => {
   <div class="knowledge-link-panel">
     <div class="resource-toolbar">
       <div><strong>{{ links.length }}</strong><span>个{{ publicMode ? '公共' : '个人' }}文档</span></div>
-      <p>点击文件夹原地展开；拖动文档到文件夹可快速移动。</p>
+      <p>按文件夹浏览，拖动文档调整归属</p>
       <el-button title="在根目录新建文件夹" :disabled="loading" @click="openCreateFolder(KNOWLEDGE_ROOT_FOLDER_ID)">
         <el-icon><FolderAdd /></el-icon>新建根文件夹
       </el-button>
@@ -459,7 +459,11 @@ watch(() => props.publicMode, () => {
           </template>
         </li>
       </ul>
-      <el-empty v-if="!loading && !visibleRows.length" description="当前文件夹为空" />
+      <el-empty v-if="!loading && !visibleRows.length" :image-size="56" description="当前文件夹为空">
+        <template #image>
+          <span class="empty-state-icon" aria-hidden="true"><el-icon><FolderOpened /></el-icon></span>
+        </template>
+      </el-empty>
     </div>
 
     <el-dialog
@@ -474,7 +478,7 @@ watch(() => props.publicMode, () => {
         <div class="content-dialog-heading">
           <div class="content-dialog-heading-icon knowledge"><el-icon><Link /></el-icon></div>
           <div>
-            <span>{{ publicMode ? 'PUBLIC KNOWLEDGE' : 'PERSONAL KNOWLEDGE' }}</span>
+            <span>{{ publicMode ? '公共知识库' : '个人知识库' }}</span>
             <strong>{{ editingLinkId ? '编辑在线文档' : '添加在线文档' }}</strong>
             <p>将可信文档链接加入知识库，Agent 会按场景读取内容。</p>
           </div>
@@ -567,7 +571,7 @@ watch(() => props.publicMode, () => {
         <div class="content-dialog-heading">
           <div class="content-dialog-heading-icon folder"><el-icon><FolderOpened /></el-icon></div>
           <div>
-            <span>KNOWLEDGE FOLDER</span>
+            <span>Knowledge folder</span>
             <strong>{{ editingFolderId ? '重命名文件夹' : '新建文件夹' }}</strong>
             <p>用清晰的目录组织在线文档。</p>
           </div>
@@ -609,7 +613,8 @@ watch(() => props.publicMode, () => {
 
 <style scoped lang="scss">
 .knowledge-link-panel {
-  width: min(1080px, 100%);
+  width: 100%;
+  max-width: var(--workspace-max-width, 1440px);
   margin: 0 auto;
 }
 
@@ -618,7 +623,7 @@ watch(() => props.publicMode, () => {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  margin: 0 0 14px;
+  margin: 0 0 16px;
   color: var(--text-muted);
   font-size: 12px;
 
@@ -639,8 +644,8 @@ watch(() => props.publicMode, () => {
 }
 
 .knowledge-root-folder-entry {
-  width: 160px;
-  padding: 7px 10px !important;
+  width: auto;
+  padding: 8px 12px !important;
   border: 1px dashed var(--line) !important;
   border-radius: 8px;
 }
@@ -668,8 +673,8 @@ watch(() => props.publicMode, () => {
 
 .knowledge-resource-row {
   min-height: 48px;
-  gap: 10px;
-  padding: 8px 12px 8px calc(12px + var(--resource-indent));
+  gap: 12px;
+  padding: 12px 16px 12px calc(16px + var(--resource-indent));
 
   &.selected-folder { background: var(--primary-soft); }
   &.folder-drop-target { background: var(--primary-soft); box-shadow: inset 0 0 0 2px var(--primary-bright); }
@@ -684,9 +689,9 @@ watch(() => props.publicMode, () => {
   display: flex;
   flex: 1;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
-  min-height: 30px;
+  min-height: 32px;
   padding: 0;
   border: 0;
   color: var(--text);
@@ -695,11 +700,10 @@ watch(() => props.publicMode, () => {
   cursor: pointer;
 }
 
-.folder-chevron { flex: 0 0 14px; width: 14px; color: var(--text-muted); transition: transform 150ms; }
+.folder-chevron { flex: 0 0 16px; width: 16px; color: var(--text-muted); transition: transform 150ms; }
 .folder-chevron.expanded { transform: rotate(90deg); }
-.folder-symbol, .link-symbol { flex: 0 0 22px; font-size: 20px; }
-.folder-symbol { color: var(--warning); }
-.link-symbol { color: var(--success); }
+.folder-symbol, .link-symbol { flex: 0 0 24px; color: var(--text-muted); font-size: 18px; }
+.knowledge-resource-row .resource-main strong { font-weight: 500; }
 .folder-detail { flex-shrink: 0; color: var(--text-muted); font-size: 11px; }
 .knowledge-link-main p { margin: 4px 0 0; -webkit-line-clamp: 1; }
 .knowledge-folder-entry:focus-visible, .knowledge-folder-path button:focus-visible {
@@ -710,8 +714,8 @@ watch(() => props.publicMode, () => {
 
 @media (max-width: 760px) {
   .knowledge-resource-row .resource-meta { display: none; }
-  .knowledge-resource-row { gap: 6px; }
-  .knowledge-folder-entry { gap: 6px; }
+  .knowledge-resource-row { gap: 8px; }
+  .knowledge-folder-entry { gap: 8px; }
   .folder-detail { display: none; }
   .knowledge-folder-count { width: 100%; max-width: 100%; margin-left: 0; }
 }

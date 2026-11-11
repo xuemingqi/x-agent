@@ -22,7 +22,7 @@ onMounted(async () => {
 <template>
   <div class="app-shell">
     <AppSidebar :mobile-open="sidebarOpen" @close="sidebarOpen = false" />
-    <button class="mobile-menu" aria-label="打开导航" @click="sidebarOpen = true">
+    <button class="mobile-menu" aria-label="打开导航" :aria-expanded="sidebarOpen" aria-controls="app-navigation" @click="sidebarOpen = true">
       <el-icon><Menu /></el-icon>
     </button>
     <main class="app-main">

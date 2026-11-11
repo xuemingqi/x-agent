@@ -19,10 +19,13 @@ import java.util.List;
 
 /**
  * 为模型调用补充图片响应暂存能力。
- * SDK 2.0.1 的 ReasoningContext 只汇总文字和工具调用，图片暂存在当前订阅的上下文中。
+ * SDK 的 ReasoningContext 只汇总文字和工具调用，图片暂存在当前订阅的上下文中。
  */
 @RequiredArgsConstructor
 public class MultimodalChatModelDecorator implements Model {
+
+    // 2.0.4 会重试空白响应，纯图片使用非空占位，向外输出和持久化前由中间件移除。
+    private static final String IMAGE_RESPONSE_PLACEHOLDER = "[image-response]";
 
     private final Model delegate;
 
@@ -44,7 +47,7 @@ public class MultimodalChatModelDecorator implements Model {
                         }
                         images.setTextPlaceholder(true);
                         return Flux.just(ChatResponse.builder().id(images.getLastResponse().getId())
-                                .content(List.of(TextBlock.builder().text(" ").build())).build());
+                                .content(List.of(TextBlock.builder().text(IMAGE_RESPONSE_PLACEHOLDER).build())).build());
                     }));
         });
     }

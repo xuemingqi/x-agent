@@ -82,9 +82,9 @@ const dialogTitle = computed(() => {
   return editingName.value ? '修改 Skill' : '创建 Skill';
 });
 const skillDialogScope = computed(() => {
-  if (activeScope.value === SKILL_SCOPE.PUBLIC) return 'PLATFORM SKILL';
-  if (activeScope.value === SKILL_SCOPE.SHARED) return 'SHARED SKILL';
-  return 'PERSONAL SKILL';
+  if (activeScope.value === SKILL_SCOPE.PUBLIC) return '公共 Skill';
+  if (activeScope.value === SKILL_SCOPE.SHARED) return '共享 Skill';
+  return '个人 Skill';
 });
 const skillDialogDescription = computed(() => {
   if (readOnly.value) return '查看 Skill 的使用场景与完整指令。';
@@ -301,9 +301,9 @@ async function respondToShare(share: SkillShare, accept: boolean): Promise<void>
 }
 
 function skillCardLabel(skill: AgentSkill): string {
-  if (skill.scope === SKILL_SCOPE.USER) return 'PERSONAL SKILL';
-  if (skill.scope === SKILL_SCOPE.SHARED) return 'SHARED SKILL';
-  return 'PLATFORM SKILL';
+  if (skill.scope === SKILL_SCOPE.USER) return '个人 Skill';
+  if (skill.scope === SKILL_SCOPE.SHARED) return '共享 Skill';
+  return '公共 Skill';
 }
 
 onMounted(async () => {
@@ -322,7 +322,7 @@ onMounted(async () => {
       <div>
         <p>Capabilities</p>
         <h1>扩展能力</h1>
-        <span>管理公共与个人 Skill、MCP 连接，并按用户隔离 Agent 扩展能力。</span>
+        <span>为 Agent 配置可复用的工作指令与工具连接</span>
       </div>
       <div
         v-if="activeExtension === 'skill'
@@ -337,7 +337,7 @@ onMounted(async () => {
             <span>ZIP / TAR / TAR.GZ · 最大 20MB</span>
             <p>每包一个 SKILL.md，使用你的默认模型整理。保留附属文件，同名 Skill 不会覆盖。</p>
           </template>
-          <el-button class="page-primary-action" type="primary" :loading="importing" @click="chooseSkillArchive">
+          <el-button class="page-secondary-action" :loading="importing" @click="chooseSkillArchive">
             <el-icon v-if="!importing"><Upload /></el-icon>
             {{ importing ? '默认模型整理中…' : '导入 Skill' }}
           </el-button>
@@ -364,25 +364,21 @@ onMounted(async () => {
       </el-button>
     </header>
 
-    <div class="extension-tabs">
-      <button :class="{ active: activeExtension === 'skill' }" @click="activeExtension = 'skill'">
-        <el-icon><MagicStick /></el-icon>
-        Skill
-        <i v-if="pendingShareCount" class="notification-dot" aria-label="有待处理的 Skill 分享邀请"></i>
-      </button>
-      <button :class="{ active: activeExtension === 'mcp' }" @click="activeExtension = 'mcp'">
-        <el-icon><Connection /></el-icon>
-        MCP
-        <span>HTTP 可用</span>
-      </button>
-    </div>
-
-    <template v-if="activeExtension === 'skill'">
-      <div v-if="importing" class="skill-import-progress" role="status">
-        <el-icon class="is-loading"><Loading /></el-icon>
-        <span>正在使用默认模型整理 Skill<span>完成后将加入“我的 Skill”</span></span>
+    <div class="capability-toolbar">
+      <div class="extension-tabs" role="tablist" aria-label="扩展类型">
+        <button role="tab" :aria-selected="activeExtension === 'skill'"
+          :class="{ active: activeExtension === 'skill' }" @click="activeExtension = 'skill'">
+          <el-icon><MagicStick /></el-icon>
+          Skill
+          <i v-if="pendingShareCount" class="notification-dot" aria-label="有待处理的 Skill 分享邀请"></i>
+        </button>
+        <button role="tab" :aria-selected="activeExtension === 'mcp'"
+          :class="{ active: activeExtension === 'mcp' }" @click="activeExtension = 'mcp'">
+          <el-icon><Connection /></el-icon>
+          MCP
+        </button>
       </div>
-      <div class="scope-switch">
+      <div v-if="activeExtension === 'skill'" class="scope-switch" aria-label="Skill 来源">
         <button :class="{ active: activeScope === SKILL_SCOPE.USER }" @click="activeScope = SKILL_SCOPE.USER">
           <el-icon><User /></el-icon>
           我的 Skill
@@ -400,14 +396,34 @@ onMounted(async () => {
           <i v-if="pendingShareCount" class="notification-dot" aria-label="有待处理的 Skill 分享邀请"></i>
         </button>
       </div>
+      <div v-else class="scope-switch" aria-label="MCP 来源">
+        <button :class="{ active: activeMcpScope === MCP_SCOPE.USER }" @click="activeMcpScope = MCP_SCOPE.USER">
+          <el-icon><User /></el-icon>
+          我的 MCP
+        </button>
+        <button :class="{ active: activeMcpScope === MCP_SCOPE.PUBLIC }" @click="activeMcpScope = MCP_SCOPE.PUBLIC">
+          <el-icon><EditPen v-if="administration.isAdministrator" /><Lock v-else /></el-icon>
+          公共 MCP
+        </button>
+      </div>
+    </div>
+    <div class="capability-summary">
+      <span v-if="activeExtension === 'skill'">{{ visibleSkills.length }} 个 Skill</span>
+      <span>开关仅对我生效 · 下一轮对话生效</span>
+    </div>
 
+    <template v-if="activeExtension === 'skill'">
+      <div v-if="importing" class="skill-import-progress" role="status">
+        <el-icon class="is-loading"><Loading /></el-icon>
+        <span>正在使用默认模型整理 Skill<span>完成后将加入“我的 Skill”</span></span>
+      </div>
       <section v-if="activeScope === SKILL_SCOPE.SHARED && pendingShareCount" class="skill-share-inbox">
         <div class="skill-share-inbox-title">
           <div>
             <span>待处理邀请</span>
             <p>接受后 Skill 才会加入你的 Agent，拒绝后不会加载。</p>
           </div>
-          <el-tag type="danger" effect="dark">{{ pendingShareCount }}</el-tag>
+          <span class="share-count">{{ pendingShareCount }} 项待处理</span>
         </div>
         <div v-loading="loadingShares" class="skill-share-list">
           <article v-for="share in pendingShares" :key="share.id" class="skill-share-card">
@@ -438,7 +454,6 @@ onMounted(async () => {
         </div>
       </section>
 
-      <p class="extension-enablement-hint">开关仅对我生效，下一轮对话生效。</p>
       <div v-loading="loading" class="skill-grid">
         <article v-for="skill in visibleSkills" :key="`${skill.scope}-${skill.name}`" class="skill-card"
           :class="{ 'extension-disabled': !skill.enabled }">
@@ -458,7 +473,7 @@ onMounted(async () => {
           <p>{{ skill.description }}</p>
           <small v-if="skill.sharedByMobile" class="skill-shared-by">由 {{ skill.sharedByMobile }} 分享</small>
           <div v-if="skill.resourcePaths.length" class="skill-resources">
-            <el-tag effect="plain">{{ skill.resourcePaths.length }} 个附属文件</el-tag>
+            <span>{{ skill.resourcePaths.length }} 个附属文件</span>
           </div>
           <div class="skill-actions">
             <el-button text @click="openSkill(skill)">
@@ -513,10 +528,15 @@ onMounted(async () => {
         </article>
         <el-empty
           v-if="!loading && !visibleSkills.length"
+          :image-size="56"
           :description="activeScope === SKILL_SCOPE.USER
             ? '还没有个人 Skill，可以在这里创建或直接让 Agent 帮你创建'
             : activeScope === SKILL_SCOPE.SHARED ? '还没有已接受的共享 Skill' : '暂无公共 Skill'"
-        />
+        >
+          <template #image>
+            <span class="empty-state-icon" aria-hidden="true"><el-icon><Document /></el-icon></span>
+          </template>
+        </el-empty>
       </div>
     </template>
 
@@ -525,6 +545,7 @@ onMounted(async () => {
       ref="mcpManagementPanel"
       v-model:active-scope="activeMcpScope"
       :administrator="administration.isAdministrator"
+      :show-scope-switch="false"
     />
 
     <el-dialog
@@ -586,7 +607,7 @@ onMounted(async () => {
               <strong>执行指令</strong>
               <p>清楚写明步骤、边界条件和期望的输出结果。</p>
             </div>
-            <span class="content-format-badge">MARKDOWN</span>
+            <span class="content-format-badge">Markdown</span>
           </header>
           <el-form-item>
             <div class="skill-content-editor">
@@ -645,12 +666,137 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+
+.capability-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.capability-toolbar .extension-tabs,
+.capability-toolbar .scope-switch {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  gap: 4px;
+}
+
+.capability-toolbar .scope-switch {
+  padding-left: 24px;
+  border-left: 1px solid var(--line);
+}
+
+.capability-toolbar button {
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.capability-toolbar .scope-switch button.active::after {
+  display: none;
+}
+
+.capability-toolbar button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.capability-summary {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 16px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.capability-summary > span:only-child {
+  margin-left: auto;
+}
+
+.skill-grid {
+  width: 100%;
+  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
+  min-height: 0;
+  align-items: stretch;
+}
+
+.skill-card {
+  min-height: 0;
+  padding: 24px;
+  border-radius: 12px;
+}
+
+.skill-card .extension-icon {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  color: var(--text-soft);
+  background: var(--surface-subtle);
+  font-size: 18px;
+}
+
+.skill-card h2 {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.skill-card > p {
+  margin: 16px 0 20px;
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.skill-resources {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.skill-share-inbox {
+  width: 100%;
+  padding: 20px;
+  border-color: var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.share-count {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+@container workspace (max-width: 760px) {
+  .capability-toolbar { gap: 12px; }
+  .capability-toolbar .scope-switch {
+    width: 100%;
+    padding-left: 0;
+    border-left: 0;
+    flex-wrap: wrap;
+  }
+  .skill-grid { grid-template-columns: minmax(0, 1fr); }
+  .skill-card { padding: 20px; }
+  .skill-share-card { flex-direction: column; align-items: stretch; gap: 16px; }
+  .skill-share-actions { justify-content: flex-end; }
+}
+
 .skill-header-actions {
   display: flex;
   align-items: center;
   flex-shrink: 0;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 
 .skill-header-actions :deep(.el-button) {
@@ -658,15 +804,15 @@ onMounted(async () => {
 }
 
 .skill-header-actions :deep(.el-button > span) {
-  gap: 7px;
+  gap: 8px;
 }
 
 .skill-import-progress {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin: 0 0 18px;
-  padding: 12px 15px;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
   border: 1px solid var(--primary-border);
   border-radius: 12px;
   color: var(--primary-action-text);
@@ -696,7 +842,7 @@ onMounted(async () => {
 }
 
 .skill-actions :deep(.el-button > span) {
-  gap: 5px;
+  gap: 4px;
 }
 
 .archive-menu-chevron {

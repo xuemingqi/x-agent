@@ -236,6 +236,7 @@ CREATE TABLE IF NOT EXISTS agent_conversation_message
     role         varchar(32)                         not null comment '消息角色',
     content      longtext                            not null comment '面向用户展示的消息内容',
     tool_call_id varchar(128)                        null comment '工具调用 ID',
+    token_usage  json                                null comment '本轮模型累计用量',
     create_time  datetime(3) default CURRENT_TIMESTAMP(3) not null comment '创建时间',
     index idx_agent_conversation_message_session (user_id, session_id, id)
 )
