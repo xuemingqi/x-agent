@@ -11,7 +11,9 @@ import {
   deleteConversation,
   getConversation,
   listConversations,
+  updateConversationKnowledgeBases,
 } from '@/api/conversation';
+import { listKnowledgeBases } from '@/api/knowledge';
 import { useModelSettingStore } from '@/stores/model-setting';
 import { CONVERSATION_FILE_KIND } from '@/types/chat';
 import { createUniqueIdentifier } from '@/utils/identifier';
@@ -26,6 +28,7 @@ import type {
   MessageRole,
   TokenUsage,
 } from '@/types/chat';
+import type { KnowledgeBase } from '@/types/knowledge';
 
 export type DisplayMessageKind = 'message' | 'status';
 
@@ -76,6 +79,8 @@ export interface QueuedMessage {
 }
 
 interface ConversationRuntimeState {
+  knowledgeBaseIds: string[];
+  savingKnowledgeBases: boolean;
   messages: DisplayMessage[];
   pendingFiles: ConversationFile[];
   queuedMessages: QueuedMessage[];
@@ -90,6 +95,8 @@ interface ConversationRuntimeState {
 
 function createConversationRuntimeState(): ConversationRuntimeState {
   return {
+    knowledgeBaseIds: [],
+    savingKnowledgeBases: false,
     messages: [],
     pendingFiles: [],
     queuedMessages: [],
@@ -108,6 +115,10 @@ export const useChatStore = defineStore('chat', () => {
   const selectedModelId = ref('');
   const conversations = ref<Conversation[]>([]);
   const currentSessionId = ref('');
+  const knowledgeBases = ref<KnowledgeBase[]>([]);
+  const draftKnowledgeBaseIds = ref<string[]>([]);
+  const loadingKnowledgeBases = ref(false);
+  const creatingConversation = ref(false);
   const runtimeStates = reactive(new Map<string, ConversationRuntimeState>());
   const uploadingFiles = ref(false);
   const abortControllers = new Map<string, AbortController>();
@@ -125,6 +136,14 @@ export const useChatStore = defineStore('chat', () => {
   const queuePaused = computed(() => getCurrentRuntimeState()?.queuePaused || false);
   const previewFile = computed(() => getCurrentRuntimeState()?.previewFile);
   const previewOpen = computed(() => getCurrentRuntimeState()?.previewOpen || false);
+  const selectedKnowledgeBaseIds = computed(() => {
+    const ids = getCurrentRuntimeState()?.knowledgeBaseIds || draftKnowledgeBaseIds.value;
+    return ids.filter((id) => knowledgeBases.value.some((base) => base.id === id && !base.isDefault));
+  });
+  const savingKnowledgeBases = computed(() => getCurrentRuntimeState()?.savingKnowledgeBases || false);
+  const knowledgeSelectionDisabled = computed(() => loading.value || sending.value || interrupting.value
+    || uploadingFiles.value || savingKnowledgeBases.value || creatingConversation.value
+    || loadingKnowledgeBases.value || queuedMessages.value.length > 0);
 
   function openHtmlPreview(file: ConversationFile): void {
     if (file.sessionId === currentSessionId.value && isHtmlFile(file)) {
@@ -209,7 +228,38 @@ export const useChatStore = defineStore('chat', () => {
     if (!models.value.some((model) => model.id === selectedModelId.value)) {
       selectedModelId.value = modelSetting.defaultModelId || models.value[0]?.id || '';
     }
-    await loadConversations();
+    await Promise.all([loadConversations(), loadKnowledgeBases()]);
+  }
+
+  async function loadKnowledgeBases(): Promise<void> {
+    loadingKnowledgeBases.value = true;
+    try {
+      knowledgeBases.value = await listKnowledgeBases();
+    } finally {
+      loadingKnowledgeBases.value = false;
+    }
+  }
+
+  async function selectKnowledgeBases(ids: string[]): Promise<void> {
+    if (knowledgeSelectionDisabled.value) return;
+    const selectedIds = [...new Set(ids)].filter((id) => knowledgeBases.value
+      .some((base) => base.id === id && !base.isDefault));
+    const runtimeState = getCurrentRuntimeState();
+    if (!runtimeState) {
+      draftKnowledgeBaseIds.value = selectedIds;
+      return;
+    }
+    const sessionId = currentSessionId.value;
+    runtimeState.savingKnowledgeBases = true;
+    try {
+      const conversation = await updateConversationKnowledgeBases(sessionId, selectedIds);
+      if (runtimeStates.get(sessionId) !== runtimeState) return;
+      runtimeState.knowledgeBaseIds = conversation.knowledgeBaseIds;
+      const index = conversations.value.findIndex((item) => item.sessionId === sessionId);
+      if (index >= 0) conversations.value[index] = conversation;
+    } finally {
+      runtimeState.savingKnowledgeBases = false;
+    }
   }
 
   async function selectModel(modelId: string): Promise<void> {
@@ -230,11 +280,20 @@ export const useChatStore = defineStore('chat', () => {
     if (!selectedModelId.value) {
       throw new Error('请先选择模型');
     }
-    const conversation = await createConversationRequest();
-    currentSessionId.value = conversation.sessionId;
-    runtimeStates.set(conversation.sessionId, createConversationRuntimeState());
-    await loadConversations();
-    return conversation;
+    if (creatingConversation.value) throw new Error('正在创建对话，请稍候');
+    creatingConversation.value = true;
+    try {
+      const conversation = await createConversationRequest([...draftKnowledgeBaseIds.value]);
+      currentSessionId.value = conversation.sessionId;
+      runtimeStates.set(conversation.sessionId, {
+        ...createConversationRuntimeState(), knowledgeBaseIds: conversation.knowledgeBaseIds,
+      });
+      draftKnowledgeBaseIds.value = [];
+      await loadConversations();
+      return conversation;
+    } finally {
+      creatingConversation.value = false;
+    }
   }
 
   async function openConversation(sessionId: string): Promise<void> {
@@ -243,12 +302,13 @@ export const useChatStore = defineStore('chat', () => {
     }
     currentSessionId.value = sessionId;
     const runtimeState = getRuntimeState(sessionId);
-    if (runtimeState.sending || runtimeState.interrupting) {
+    if (runtimeState.sending || runtimeState.interrupting || runtimeState.savingKnowledgeBases) {
       return;
     }
     runtimeState.loading = true;
     try {
       const conversation = await getConversation(sessionId);
+      runtimeState.knowledgeBaseIds = conversation.knowledgeBaseIds;
       runtimeState.messages = mapHistoryMessages(conversation.messages, conversation.files || []);
     } finally {
       runtimeState.loading = false;
@@ -257,6 +317,7 @@ export const useChatStore = defineStore('chat', () => {
 
   function closeConversation(): void {
     currentSessionId.value = '';
+    draftKnowledgeBaseIds.value = [];
   }
 
   async function removeConversation(sessionId: string): Promise<void> {
@@ -284,7 +345,8 @@ export const useChatStore = defineStore('chat', () => {
       return;
     }
     const runtimeState = getRuntimeState(sessionId);
-    if (runtimeState.loading || uploadingFiles.value || (!content.trim() && !runtimeState.pendingFiles.length)) {
+    if (runtimeState.loading || runtimeState.savingKnowledgeBases || uploadingFiles.value
+      || (!content.trim() && !runtimeState.pendingFiles.length)) {
       return;
     }
     runtimeState.queuedMessages.push({
@@ -433,7 +495,8 @@ export const useChatStore = defineStore('chat', () => {
       throw new Error('请先配置个人模型');
     }
     const runtimeState = getCurrentRuntimeState();
-    if (!currentSessionId.value || !runtimeState || !files.length || uploadingFiles.value) {
+    if (!currentSessionId.value || !runtimeState || !files.length || uploadingFiles.value
+      || runtimeState.savingKnowledgeBases) {
       return;
     }
     if (runtimeState.pendingFiles.length + files.length > 5) {
@@ -947,6 +1010,10 @@ export const useChatStore = defineStore('chat', () => {
     runtimeStates.clear();
     conversations.value = [];
     currentSessionId.value = '';
+    knowledgeBases.value = [];
+    draftKnowledgeBaseIds.value = [];
+    loadingKnowledgeBases.value = false;
+    creatingConversation.value = false;
     selectedModelId.value = '';
     uploadingFiles.value = false;
   }
@@ -957,6 +1024,14 @@ export const useChatStore = defineStore('chat', () => {
     selectedModel,
     conversations,
     currentSessionId,
+    knowledgeBases,
+    selectedKnowledgeBaseIds,
+    loadingKnowledgeBases,
+    savingKnowledgeBases,
+    creatingConversation,
+    knowledgeSelectionDisabled,
+    selectKnowledgeBases,
+    loadKnowledgeBases,
     messages,
     loading,
     sending,

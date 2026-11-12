@@ -13,6 +13,16 @@ import lombok.experimental.Accessors;
 public class KnowledgeSearchResultDo {
 
     /**
+     * 文档所属知识库 ID。
+     */
+    private String knowledgeBaseId;
+
+    /**
+     * 文档所属知识库名称，用于区分同名来源。
+     */
+    private String knowledgeBaseName;
+
+    /**
      * 来源文档相对路径。
      */
     @Schema(name = "path", description = "来源文档在所属知识库中的相对路径")

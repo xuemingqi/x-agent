@@ -1,7 +1,8 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getConversation, listConversations } from '@/api/conversation';
+import { createConversation, getConversation, listConversations, updateConversationKnowledgeBases } from '@/api/conversation';
+import { listKnowledgeBases } from '@/api/knowledge';
 import { listModels } from '@/api/model';
 import { completeBrowserScreenshot, interruptTask, streamChat } from '@/api/chat';
 import { captureBrowserScreenshot, supportsBrowserScreenshot } from '@/utils/browser-screenshot';
@@ -25,7 +26,10 @@ vi.mock('@/api/conversation', () => ({
   deleteConversation: vi.fn(),
   getConversation: vi.fn(),
   listConversations: vi.fn(),
+  updateConversationKnowledgeBases: vi.fn(),
 }));
+
+vi.mock('@/api/knowledge', () => ({ listKnowledgeBases: vi.fn() }));
 
 vi.mock('@/api/conversation-file', () => ({
   deletePendingConversationFile: vi.fn(),
@@ -46,10 +50,104 @@ describe('chat store', () => {
     setActivePinia(createPinia());
     vi.mocked(listModels).mockResolvedValue([{ id: 'model-1', name: 'Model 1', modelName: 'model-1', isDefault: true, modelUrl: 'https://example.com/v1', contextWindowSize: 131072, temperature: null }]);
     vi.mocked(listConversations).mockResolvedValue([]);
+    vi.mocked(listKnowledgeBases).mockResolvedValue([
+      { id: 'common', name: '公共知识库', description: '', isDefault: true },
+      { id: 'rules', name: '业务规则', description: '', isDefault: false },
+      { id: 'product', name: '产品说明', description: '', isDefault: false },
+    ]);
+    vi.mocked(createConversation).mockImplementation(async (ids = []) => ({
+      ...emptyConversation('new-session'), knowledgeBaseIds: [...ids],
+    }));
+    vi.mocked(updateConversationKnowledgeBases).mockImplementation(async (sessionId, ids) => ({
+      ...emptyConversation(sessionId), knowledgeBaseIds: [...ids],
+    }));
     vi.mocked(getConversation).mockImplementation(async (sessionId) => emptyConversation(sessionId));
     vi.mocked(interruptTask).mockResolvedValue({ accepted: true });
     vi.mocked(supportsBrowserScreenshot).mockReturnValue(true);
     vi.mocked(completeBrowserScreenshot).mockResolvedValue(true);
+  });
+
+  it('persists multiple draft knowledge bases before the first request and always leaves the common base automatic', async () => {
+    const streams = captureStreams();
+    const chat = useChatStore();
+    await chat.initialize();
+    await chat.selectKnowledgeBases(['common', 'rules', 'rules', 'product']);
+    expect(chat.selectedKnowledgeBaseIds).toEqual(['rules', 'product']);
+    expect(updateConversationKnowledgeBases).not.toHaveBeenCalled();
+
+    await chat.createConversation();
+    expect(createConversation).toHaveBeenCalledWith(['rules', 'product']);
+    expect(chat.selectedKnowledgeBaseIds).toEqual(['rules', 'product']);
+    const sending = chat.send('按知识库回答');
+    expect(streamChat).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'new-session' }),
+      expect.any(Function), expect.any(AbortSignal));
+    streams[0].finish();
+    await sending;
+    chat.closeConversation();
+    expect(chat.selectedKnowledgeBaseIds).toEqual([]);
+  });
+
+  it('restores each conversation selection and keeps late updates with their originating conversation', async () => {
+    vi.mocked(getConversation).mockImplementation(async (sessionId) => ({
+      ...emptyConversation(sessionId), knowledgeBaseIds: sessionId === 'session-1' ? ['rules'] : ['product'],
+    }));
+    const chat = await openChat();
+    expect(chat.selectedKnowledgeBaseIds).toEqual(['rules']);
+    let finish!: (conversation: Conversation) => void;
+    vi.mocked(updateConversationKnowledgeBases).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    const updating = chat.selectKnowledgeBases(['rules', 'product']);
+    expect(chat.savingKnowledgeBases).toBe(true);
+    await chat.openConversation('session-2');
+    expect(chat.selectedKnowledgeBaseIds).toEqual(['product']);
+    finish({ ...emptyConversation('session-1'), knowledgeBaseIds: ['rules', 'product'] });
+    await updating;
+    expect(chat.selectedKnowledgeBaseIds).toEqual(['product']);
+    expect(updateConversationKnowledgeBases).toHaveBeenCalledWith('session-1', ['rules', 'product']);
+  });
+
+  it('hides deleted knowledge bases from the selector while keeping common knowledge implicit', async () => {
+    const savedIds = ['deleted-base', 'rules', 'common'];
+    vi.mocked(getConversation).mockResolvedValue({
+      ...emptyConversation('session-1'), knowledgeBaseIds: savedIds,
+    });
+    const chat = await openChat();
+
+    expect(chat.selectedKnowledgeBaseIds).toEqual(['rules']);
+    expect(chat.knowledgeBases.find((base) => base.isDefault)?.id).toBe('common');
+    expect(updateConversationKnowledgeBases).not.toHaveBeenCalled();
+    expect(savedIds).toEqual(['deleted-base', 'rules', 'common']);
+  });
+
+  it('keeps the saved selection on failure and prevents generation while knowledge sources are saving', async () => {
+    const chat = await openChat();
+    let reject!: (error: Error) => void;
+    vi.mocked(updateConversationKnowledgeBases).mockReturnValue(new Promise((_, fail) => { reject = fail; }));
+    const updating = chat.selectKnowledgeBases(['rules']);
+    const failure = expect(updating).rejects.toThrow('保存失败');
+    await chat.send('等待关联保存');
+    expect(streamChat).not.toHaveBeenCalled();
+    expect(chat.knowledgeSelectionDisabled).toBe(true);
+    reject(new Error('保存失败'));
+    await failure;
+    expect(chat.selectedKnowledgeBaseIds).toEqual([]);
+    expect(chat.savingKnowledgeBases).toBe(false);
+  });
+
+  it('keeps knowledge sources fixed throughout generation and a paused queue', async () => {
+    const streams = captureStreams();
+    const chat = await openChat();
+    const sending = chat.send('查询规则');
+    const failure = expect(sending).rejects.toThrow('连接已断开');
+    await chat.selectKnowledgeBases(['product']);
+    expect(updateConversationKnowledgeBases).not.toHaveBeenCalled();
+    expect(chat.knowledgeSelectionDisabled).toBe(true);
+    await chat.send('后续查询');
+    streams[0].close();
+    await failure;
+    expect(chat.queuePaused).toBe(true);
+    expect(chat.knowledgeSelectionDisabled).toBe(true);
+    await chat.selectKnowledgeBases(['product']);
+    expect(updateConversationKnowledgeBases).not.toHaveBeenCalled();
   });
 
   it('replaces cumulative token snapshots without double counting and restores them from history', async () => {
@@ -646,6 +744,7 @@ function emptyConversation(sessionId: string): Conversation {
   return {
     sessionId,
     title: null,
+    knowledgeBaseIds: [],
     createdAt: null,
     updatedAt: null,
     messages: [],

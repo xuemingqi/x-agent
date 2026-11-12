@@ -122,6 +122,7 @@ CREATE TABLE IF NOT EXISTS agent_conversation
         primary key,
     user_id     varchar(64)                        not null comment '所属用户 ID',
     title       varchar(255)                       not null comment '对话标题',
+    knowledge_base_ids json                        null comment '额外关联的个人知识库 ID 数组，公共知识库自动关联',
     create_time datetime default CURRENT_TIMESTAMP not null comment '创建时间',
     update_time datetime default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间',
     index idx_agent_conversation_user_time (user_id, update_time)

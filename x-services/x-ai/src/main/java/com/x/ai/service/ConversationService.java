@@ -8,11 +8,22 @@ import java.util.List;
 public interface ConversationService {
 
     /**
-     * 为当前登录用户创建对话。
+     * 为当前登录用户创建对话，并保存额外关联的个人知识库；公共知识库自动参与检索。
      *
+     * @param knowledgeBaseIds 额外关联的知识库 ID，空列表表示仅使用个人公共知识库
      * @return 新建的对话
      */
-    ConversationDo create();
+    ConversationDo create(List<String> knowledgeBaseIds);
+
+    /**
+     * 替换当前用户对话额外关联的知识库，校验所有知识库均属于本人。
+     */
+    ConversationDo updateKnowledgeBases(String sessionId, List<String> knowledgeBaseIds);
+
+    /**
+     * 为异步执行读取指定用户的会话知识库快照；新会话返回空列表。
+     */
+    List<String> knowledgeBaseIds(String userId, String sessionId);
 
     /**
      * 查询当前登录用户的对话列表。

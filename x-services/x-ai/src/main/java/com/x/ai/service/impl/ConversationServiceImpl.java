@@ -18,6 +18,7 @@ import com.x.framework.common.utils.IdUtil;
 import com.x.ai.service.AgentScopeStoreService;
 import com.x.ai.service.ConversationFileService;
 import com.x.ai.service.ConversationService;
+import com.x.ai.service.KnowledgeBaseService;
 import io.agentscope.core.state.AgentStateStore;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -43,14 +44,33 @@ public class ConversationServiceImpl implements ConversationService {
 
     private final ConversationFileService conversationFileService;
 
+    private final KnowledgeBaseService knowledgeBaseService;
 
     private final Snowflake snowflake;
 
     @Override
-    public ConversationDo create() {
+    public ConversationDo create(List<String> knowledgeBaseIds) {
+        String userId = currentUserId();
+        List<String> selectedIds = selectedKnowledgeBases(userId, knowledgeBaseIds);
         String sessionId = IdUtil.fastUUID();
-        AgentConversation conversation = createConversation(currentUserId(), sessionId, DEFAULT_TITLE);
-        return toConversation(conversation);
+        return toConversation(createConversation(userId, sessionId, DEFAULT_TITLE, selectedIds));
+    }
+
+    @Override
+    public ConversationDo updateKnowledgeBases(String sessionId, List<String> knowledgeBaseIds) {
+        String userId = currentUserId();
+        AgentConversation conversation = requireConversation(userId, sessionId);
+        List<String> selectedIds = selectedKnowledgeBases(userId, knowledgeBaseIds);
+        agentConversationIService.updateById(new AgentConversation()
+                .setSessionId(sessionId).setKnowledgeBaseIds(selectedIds));
+        return toConversation(conversation.setKnowledgeBaseIds(selectedIds));
+    }
+
+    @Override
+    public List<String> knowledgeBaseIds(String userId, String sessionId) {
+        AgentConversation conversation = findConversation(userId, sessionId);
+        return conversation == null || conversation.getKnowledgeBaseIds() == null
+                ? List.of() : List.copyOf(conversation.getKnowledgeBaseIds());
     }
 
     @Override
@@ -108,17 +128,16 @@ public class ConversationServiceImpl implements ConversationService {
         Long parentMessageId = newConversation ? null : latestMessageId(userId, sessionId);
         String title = content.length() <= TITLE_LENGTH ? content : content.substring(0, TITLE_LENGTH);
         if (newConversation) {
-            conversation = createConversation(userId, sessionId, title);
+            conversation = createConversation(userId, sessionId, title, List.of());
         }
         Long messageId = saveMessage(userId, sessionId, parentMessageId,
                 new ConversationMessageDo()
                         .setRole(ConversationMessageRole.USER)
                         .setContent(content));
         if (!newConversation) {
-            if (DEFAULT_TITLE.equals(conversation.getTitle())) {
-                conversation.setTitle(title);
-            }
-            agentConversationIService.updateById(conversation);
+            // 只更新标题，避免本轮读取的旧快照覆盖并发变更的知识库关联。
+            agentConversationIService.updateById(new AgentConversation().setSessionId(sessionId)
+                    .setTitle(DEFAULT_TITLE.equals(conversation.getTitle()) ? title : conversation.getTitle()));
         }
         return messageId;
     }
@@ -163,15 +182,23 @@ public class ConversationServiceImpl implements ConversationService {
         return messageId;
     }
 
-    private AgentConversation createConversation(String userId, String sessionId, String title) {
+    /**
+     * 显式保存对话关联范围，外部隐式创建的会话传空列表，仅检索个人公共知识库。
+     */
+    private AgentConversation createConversation(String userId, String sessionId, String title,
+                                                 List<String> knowledgeBaseIds) {
         AgentConversation conversation = new AgentConversation()
                 .setSessionId(sessionId)
                 .setUserId(userId)
-                .setTitle(title);
+                .setTitle(title)
+                .setKnowledgeBaseIds(knowledgeBaseIds);
         agentConversationIService.save(conversation);
         return conversation;
     }
 
+    /**
+     * 查询并校验会话所有者，其他用户的会话不对调用方可见。
+     */
     private AgentConversation findConversation(String userId, String sessionId) {
         AgentConversation conversation = agentConversationIService.getById(sessionId);
         if (conversation == null || !userId.equals(conversation.getUserId())) {
@@ -180,6 +207,9 @@ public class ConversationServiceImpl implements ConversationService {
         return conversation;
     }
 
+    /**
+     * 关联变更与详情操作只允许操作本人已有会话。
+     */
     private AgentConversation requireConversation(String userId, String sessionId) {
         AgentConversation conversation = findConversation(userId, sessionId);
         if (conversation == null) {
@@ -199,14 +229,27 @@ public class ConversationServiceImpl implements ConversationService {
         return CollectionUtils.isEmpty(messages) ? null : messages.getFirst().getId();
     }
 
+    /**
+     * 对外返回关联 ID，公共知识库由运行时自动补充。
+     */
     private ConversationDo toConversation(AgentConversation conversation) {
         return new ConversationDo()
                 .setSessionId(conversation.getSessionId())
                 .setTitle(conversation.getTitle())
+                .setKnowledgeBaseIds(conversation.getKnowledgeBaseIds() == null
+                        ? List.of() : List.copyOf(conversation.getKnowledgeBaseIds()))
                 .setCreatedAt(conversation.getCreateTime() == null ? null : conversation.getCreateTime().toString())
                 .setUpdatedAt(conversation.getUpdateTime() == null ? null : conversation.getUpdateTime().toString())
                 .setMessages(List.of())
                 .setFiles(List.of());
+    }
+
+    /**
+     * 校验显式关联属于本人，并移除自动关联的公共库和重复项。
+     */
+    private List<String> selectedKnowledgeBases(String userId, List<String> knowledgeBaseIds) {
+        return knowledgeBaseService.requireOwned(userId, knowledgeBaseIds).stream()
+                .filter(base -> !base.isDefault()).map(base -> base.getId()).distinct().toList();
     }
 
     private ConversationMessageDo toMessage(AgentConversationMessage message) {

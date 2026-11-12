@@ -47,6 +47,8 @@ export interface ConversationMessage {
 export interface Conversation {
   sessionId: string;
   title: string | null;
+  /** 显式关联的个人知识库；公共知识库由服务端自动关联。 */
+  knowledgeBaseIds: string[];
   createdAt: string | null;
   updatedAt: string | null;
   messages: ConversationMessage[];

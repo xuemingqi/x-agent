@@ -4,6 +4,7 @@ import { computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import ChatComposer from '@/components/chat/ChatComposer.vue';
+import ChatKnowledgeSources from '@/components/chat/ChatKnowledgeSources.vue';
 import ChatTimeline from '@/components/chat/ChatTimeline.vue';
 import FileHtmlPreview from '@/components/file/FileHtmlPreview.vue';
 import { useChatStore } from '@/stores/chat';
@@ -18,6 +19,25 @@ const conversationTitle = computed(() => chat.conversations.find((item) => item.
   || (chat.currentSessionId ? '当前对话' : '新对话'));
 const previewHint = computed(() => chat.previewFile ? (chat.previewOpen ? '收起预览侧栏' : '打开预览侧栏') : '生成 HTML 后可在这里预览');
 const awaitingScreenshot = computed(() => chat.messages.some((message) => message.screenshots?.some((request) => request.status === 'pending')));
+const selectedKnowledgeBases = computed(() => chat.knowledgeBases
+  .filter((base) => !base.isDefault && chat.selectedKnowledgeBaseIds.includes(base.id)));
+const commonKnowledgeName = computed(() => chat.knowledgeBases.find((base) => base.isDefault)?.name || '公共知识库');
+
+async function updateKnowledgeBases(ids: string[]): Promise<void> {
+  try {
+    await chat.selectKnowledgeBases(ids);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '关联知识库失败');
+  }
+}
+
+async function refreshKnowledgeBases(): Promise<void> {
+  try {
+    await chat.loadKnowledgeBases();
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '知识库加载失败');
+  }
+}
 
 function togglePreview(): void {
   if (chat.previewOpen) chat.closeHtmlPreview();
@@ -166,7 +186,7 @@ async function removeQueuedMessage(messageId: string): Promise<void> {
           :queued-messages="chat.queuedMessages"
           :interrupting="chat.interrupting"
           :queue-paused="chat.queuePaused"
-          :loading="chat.loading"
+          :loading="chat.loading || chat.savingKnowledgeBases || chat.creatingConversation"
           @send="send"
           @stop="stop"
           @steer="steer"
@@ -178,7 +198,25 @@ async function removeQueuedMessage(messageId: string): Promise<void> {
           @remove-file="removeFile"
           @configure-model="modelSetting.openDialog"
           @update:model-id="updateModel"
-        />
+        >
+          <template #context="{ disabled }">
+            <div class="composer-knowledge-context" aria-label="已关联知识库">
+              <span class="common-knowledge-source" :title="`${commonKnowledgeName}：所有会话自动检索`">{{ commonKnowledgeName }} · 自动关联</span>
+              <span v-for="base in selectedKnowledgeBases" :key="base.id" class="selected-knowledge-source">
+                <span :title="base.name">{{ base.name }}</span>
+                <button type="button" :aria-label="`移除知识库 ${base.name}`" :disabled="chat.knowledgeSelectionDisabled || disabled"
+                  @click="updateKnowledgeBases(chat.selectedKnowledgeBaseIds.filter((id) => id !== base.id))">×</button>
+              </span>
+              <span v-if="chat.savingKnowledgeBases" class="knowledge-save-status" role="status">正在保存…</span>
+            </div>
+          </template>
+          <template #tools="{ disabled }">
+            <ChatKnowledgeSources :key="chat.currentSessionId || 'draft'" :knowledge-bases="chat.knowledgeBases"
+              :selected-ids="chat.selectedKnowledgeBaseIds" :disabled="chat.knowledgeSelectionDisabled || disabled"
+              :loading="chat.loadingKnowledgeBases" :saving="chat.savingKnowledgeBases"
+              @change="updateKnowledgeBases" @reload="refreshKnowledgeBases" />
+          </template>
+        </ChatComposer>
       </section>
       <FileHtmlPreview
         v-if="chat.previewFile"
@@ -218,6 +256,70 @@ async function removeQueuedMessage(messageId: string): Promise<void> {
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.composer-knowledge-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  max-height: 76px;
+  margin: 0 0 12px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+.common-knowledge-source {
+  padding: 4px 0;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.selected-knowledge-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 220px;
+  padding: 2px 4px 2px 8px;
+  border-radius: 6px;
+  color: var(--text-soft);
+  background: var(--surface-control);
+}
+
+.selected-knowledge-source > span {
+  overflow: hidden;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selected-knowledge-source button {
+  display: grid;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  color: var(--text-muted);
+  background: transparent;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.selected-knowledge-source button:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-control-hover);
+}
+
+.selected-knowledge-source button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.knowledge-save-status {
+  color: var(--text-muted);
 }
 
 .preview-toggle {

@@ -11,6 +11,16 @@ import java.time.LocalDateTime;
 @Schema(name = "KnowledgeDocumentDo", description = "用户知识库文档")
 public class KnowledgeDocumentDo {
 
+    /**
+     * 文档所属知识库 ID。
+     */
+    private String knowledgeBaseId;
+
+    /**
+     * 文档所属知识库名称，用于区分同名来源。
+     */
+    private String knowledgeBaseName;
+
     @Schema(name = "path", description = "文档在当前用户知识库中的相对路径")
     private String path;
 

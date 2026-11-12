@@ -1,5 +1,7 @@
 import { request, requestBlob } from './http';
 import type {
+  KnowledgeBase,
+  KnowledgeBasePayload,
   KnowledgeChunkPage,
   KnowledgeDocument,
   KnowledgeLink,
@@ -10,57 +12,74 @@ import type {
   KnowledgeSearchResult,
 } from '@/types/knowledge';
 
-export function getKnowledgeDocumentPreview(path: string): Promise<KnowledgePreview> {
-  return request<KnowledgePreview>({ url: '/knowledge/documents/preview', method: 'GET', params: { path } });
+export function listKnowledgeBases(): Promise<KnowledgeBase[]> {
+  return request<KnowledgeBase[]>({ url: '/knowledge/bases', method: 'GET' });
 }
 
-export function listKnowledgeDocumentChunks(path: string, page = 1, size = 20): Promise<KnowledgeChunkPage> {
+export function createKnowledgeBase(payload: KnowledgeBasePayload): Promise<KnowledgeBase> {
+  return request<KnowledgeBase>({ url: '/knowledge/bases', method: 'POST', data: payload });
+}
+
+export function updateKnowledgeBase(id: string, payload: KnowledgeBasePayload): Promise<KnowledgeBase> {
+  return request<KnowledgeBase>({ url: `/knowledge/bases/${encodeURIComponent(id)}`, method: 'PUT', data: payload });
+}
+
+export function deleteKnowledgeBase(id: string): Promise<boolean> {
+  return request<boolean>({ url: `/knowledge/bases/${encodeURIComponent(id)}`, method: 'DELETE' });
+}
+
+export function getKnowledgeDocumentPreview(knowledgeBaseId: string, path: string): Promise<KnowledgePreview> {
+  return request<KnowledgePreview>({ url: '/knowledge/documents/preview', method: 'GET', params: { knowledgeBaseId, path } });
+}
+
+export function listKnowledgeDocumentChunks(knowledgeBaseId: string, path: string, page = 1, size = 20): Promise<KnowledgeChunkPage> {
   return request<KnowledgeChunkPage>({
-    url: '/knowledge/documents/chunks', method: 'GET', params: { path, page, size },
+    url: '/knowledge/documents/chunks', method: 'GET', params: { knowledgeBaseId, path, page, size },
   });
 }
 
-export function reindexKnowledgeDocument(path: string): Promise<KnowledgeDocument> {
+export function reindexKnowledgeDocument(knowledgeBaseId: string, path: string): Promise<KnowledgeDocument> {
   return request<KnowledgeDocument>({
-    url: '/knowledge/documents/reindex', method: 'POST', params: { path }, timeout: 300000,
+    url: '/knowledge/documents/reindex', method: 'POST', params: { knowledgeBaseId, path }, timeout: 300000,
   });
 }
 
-export function searchKnowledgeDocuments(query: string, limit = 6): Promise<KnowledgeSearchResult[]> {
+export function searchKnowledgeDocuments(knowledgeBaseId: string, query: string, limit = 6): Promise<KnowledgeSearchResult[]> {
   return request<KnowledgeSearchResult[]>({
-    url: '/knowledge/documents/search', method: 'POST', data: { query, limit }, timeout: 300000,
+    url: '/knowledge/documents/search', method: 'POST', data: { knowledgeBaseId, query, limit }, timeout: 300000,
   });
 }
 
-export function listKnowledgeDocuments(): Promise<KnowledgeDocument[]> {
-  return request<KnowledgeDocument[]>({ url: '/knowledge/documents', method: 'GET' });
+export function listKnowledgeDocuments(knowledgeBaseId: string): Promise<KnowledgeDocument[]> {
+  return request<KnowledgeDocument[]>({ url: '/knowledge/documents', method: 'GET', params: { knowledgeBaseId } });
 }
 
-export function uploadKnowledgeDocuments(files: File[]): Promise<KnowledgeDocument[]> {
+export function uploadKnowledgeDocuments(knowledgeBaseId: string, files: File[]): Promise<KnowledgeDocument[]> {
   const data = new FormData();
   files.forEach((file) => data.append('files', file));
   return request<KnowledgeDocument[]>({
     url: '/knowledge/documents',
     method: 'POST',
     data,
+    params: { knowledgeBaseId },
     timeout: 300000,
   });
 }
 
-export function downloadKnowledgeDocument(path: string): Promise<Blob> {
+export function downloadKnowledgeDocument(knowledgeBaseId: string, path: string): Promise<Blob> {
   return requestBlob({
     url: '/knowledge/documents/download',
     method: 'GET',
-    params: { path },
+    params: { knowledgeBaseId, path },
     timeout: 300000,
   });
 }
 
-export function deleteKnowledgeDocument(path: string): Promise<boolean> {
+export function deleteKnowledgeDocument(knowledgeBaseId: string, path: string): Promise<boolean> {
   return request<boolean>({
     url: '/knowledge/documents',
     method: 'DELETE',
-    params: { path },
+    params: { knowledgeBaseId, path },
   });
 }
 

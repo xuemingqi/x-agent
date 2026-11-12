@@ -12,12 +12,17 @@ import lombok.experimental.Accessors;
 public class KnowledgeDocument {
 
     /**
+     * 文档所属知识库 ID。
+     */
+    private String knowledgeBaseId;
+
+    /**
      * 文档所属用户 ID。
      */
     private String ownerId;
 
     /**
-     * 同一所有者下唯一的文档相对路径。
+     * 同一用户的知识库内唯一的文档相对路径。
      */
     private String path;
 

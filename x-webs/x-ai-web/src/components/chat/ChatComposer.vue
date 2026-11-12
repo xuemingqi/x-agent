@@ -440,6 +440,7 @@ function formatSize(sizeBytes: number): string {
           <span><strong>正在上传…</strong><small>完成后即可发送</small></span>
         </div>
       </div>
+      <slot name="context" :disabled="Boolean(editingMessage)" />
       <div class="composer-input-area">
         <span v-if="selectedSkill && !editingMessage" class="selected-skill-chip">
           <el-icon><MagicStick /></el-icon>
@@ -484,6 +485,7 @@ function formatSize(sizeBytes: number): string {
         >
           <el-icon><Plus /></el-icon>
         </button>
+        <slot name="tools" :disabled="Boolean(editingMessage)" />
         <el-select
           :model-value="composerModelId"
           class="model-select"
@@ -523,6 +525,20 @@ function formatSize(sizeBytes: number): string {
 </template>
 
 <style scoped>
+.chat-composer {
+  container-name: composer;
+  container-type: inline-size;
+}
+
+.composer-footer {
+  flex-wrap: wrap;
+}
+
+@container composer (max-width: 620px) {
+  .composer-hint { display: none; }
+  .model-select { flex: 0 1 auto; max-width: 32%; }
+}
+
 .model-setting-required {
   display: flex;
   align-items: center;

@@ -1,6 +1,20 @@
+export interface KnowledgeBase {
+  id: string;
+  name: string;
+  description: string;
+  isDefault: boolean;
+}
+
+export interface KnowledgeBasePayload {
+  name: string;
+  description: string;
+}
+
 export type KnowledgeIndexStatus = 'UNINDEXED' | 'INDEXING' | 'READY' | 'FAILED';
 
 export interface KnowledgeDocument {
+  knowledgeBaseId: string;
+  knowledgeBaseName: string;
   path: string;
   name: string;
   size: number;
@@ -33,6 +47,8 @@ export interface KnowledgeChunkPage {
 }
 
 export interface KnowledgeSearchResult {
+  knowledgeBaseId: string;
+  knowledgeBaseName: string;
   path: string;
   name: string;
   chunkIndex: number;

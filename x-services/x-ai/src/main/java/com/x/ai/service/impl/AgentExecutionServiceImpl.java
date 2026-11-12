@@ -18,6 +18,7 @@ import com.x.ai.common.model.UserContext;
 import com.x.ai.common.model.AiModelRuntimeConfig;
 import com.x.ai.db.enums.ConversationMessageRole;
 import com.x.framework.common.utils.IdUtil;
+import com.x.framework.common.utils.JsonUtil;
 import com.x.framework.common.utils.StringUtil;
 import com.x.ai.properties.AgentProperties;
 import com.x.ai.properties.BrowserScreenshotProperties;
@@ -28,6 +29,8 @@ import com.x.ai.service.ConversationFileService;
 import com.x.ai.service.ConversationService;
 import com.x.ai.service.ConversationTurnRecordService;
 import com.x.ai.service.HarnessAgentService;
+import com.x.ai.service.KnowledgeBaseService;
+import com.x.ai.service.RagKnowledgeService;
 import com.x.ai.service.AiModelRuntimeService;
 import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEndEvent;
@@ -85,6 +88,10 @@ public class AgentExecutionServiceImpl implements AgentExecutionService {
 
     private static final String DATA_USAGE = "usage";
 
+    private static final int KNOWLEDGE_RESULT_LIMIT = 6;
+
+    private static final int KNOWLEDGE_QUERY_MAX_CHARACTERS = 2000;
+
     private final HarnessAgentService harnessAgentService;
 
     private final AiModelRuntimeService aiModelRuntimeService;
@@ -102,6 +109,10 @@ public class AgentExecutionServiceImpl implements AgentExecutionService {
     private final BrowserScreenshotService browserScreenshotService;
 
     private final BrowserScreenshotProperties browserScreenshotProperties;
+
+    private final KnowledgeBaseService knowledgeBaseService;
+
+    private final RagKnowledgeService ragKnowledgeService;
 
 
     @Override
@@ -122,7 +133,7 @@ public class AgentExecutionServiceImpl implements AgentExecutionService {
 
     @Override
     public AgentResponseDo runStandalone(UserContext userContext, AgentRequestDto request) {
-        PreparedAgentExecution execution = prepareExecution(userContext, request, null, List.of(), IdUtil.fastUUID());
+        PreparedAgentExecution execution = prepareExecution(userContext, request, null, List.of(), List.of(), IdUtil.fastUUID());
         return executeBlocking(execution, request);
     }
 
@@ -346,10 +357,12 @@ public class AgentExecutionServiceImpl implements AgentExecutionService {
     /**
      * 将用户身份与本次请求携带的模型和业务属性分别写入 AgentScope 运行时上下文。
      */
-    private RuntimeContext createRuntimeContext(String userId, AgentRequestDto request, Long userMessageId) {
+    private RuntimeContext createRuntimeContext(String userId, AgentRequestDto request, Long userMessageId,
+                                                List<String> knowledgeBaseIds) {
         ToolContext toolContext = new ToolContext()
                 .setUserId(userId)
-                .setModelId(request.getModelId());
+                .setModelId(request.getModelId())
+                .setKnowledgeBaseIds(knowledgeBaseIds);
         FileToolContext fileToolContext = new FileToolContext()
                 .setMessageId(userMessageId);
         return RuntimeContext.builder()
@@ -369,19 +382,25 @@ public class AgentExecutionServiceImpl implements AgentExecutionService {
         Long userMessageId = conversationService.appendUserMessage(userId, request.getSessionId(), request.getRequest());
         List<ConversationFileDo> attachments = conversationFileService.prepareInputs(userId, request.getSessionId(),
                 request.getAttachmentIds(), userMessageId);
-        return prepareExecution(userContext, request, userMessageId, attachments, taskId);
+        List<String> selectedIds = conversationService.knowledgeBaseIds(userId, request.getSessionId());
+        return prepareExecution(userContext, request, userMessageId, attachments, selectedIds, taskId);
     }
 
     /**
      * 校验模型并准备一次同步或流式执行共享的上下文和输入。
      */
     private PreparedAgentExecution prepareExecution(UserContext userContext, AgentRequestDto request,
-                                               Long userMessageId, List<ConversationFileDo> attachments, String taskId) {
+                                               Long userMessageId, List<ConversationFileDo> attachments,
+                                               List<String> selectedKnowledgeBaseIds, String taskId) {
         AiModelRuntimeConfig model = aiModelRuntimeService.requireRuntimeModel(userContext.getUserId(), request.getModelId());
+        List<String> knowledgeBaseIds = List.copyOf(knowledgeBaseService.searchableBaseIds(
+                userContext.getUserId(), selectedKnowledgeBaseIds));
+        String inputText = buildKnowledgeInput(userContext.getUserId(), request.getRequest(), knowledgeBaseIds,
+                buildAgentInput(request, attachments));
         HarnessAgent agent = harnessAgentService.getAgent(model, userContext.getUserId());
-        RuntimeContext context = createRuntimeContext(userContext.getUserId(), request, userMessageId);
+        RuntimeContext context = createRuntimeContext(userContext.getUserId(), request, userMessageId, knowledgeBaseIds);
         List<ContentBlock> content = new ArrayList<>();
-        content.add(TextBlock.builder().text(buildAgentInput(request, attachments)).build());
+        content.add(TextBlock.builder().text(inputText).build());
         if (model.getMultimodalCapability().isImageInput()) {
             content.addAll(conversationFileService.readInputImages(userContext.getUserId(), request.getSessionId(), attachments));
         }
@@ -393,6 +412,17 @@ public class AgentExecutionServiceImpl implements AgentExecutionService {
                 .setAgent(agent)
                 .setContext(context)
                 .setInput(input);
+    }
+
+    /**
+     * 每轮先按公共库与会话关联库联合检索，让模型直接获得来源与正文，后续工具沿用同一范围。
+     */
+    private String buildKnowledgeInput(String userId, String query, List<String> knowledgeBaseIds, String input) {
+        String results = JsonUtil.toJsonStrOrThrow(ragKnowledgeService.search(
+                userId, knowledgeBaseIds, query.substring(0, Math.min(query.length(), KNOWLEDGE_QUERY_MAX_CHARACTERS)),
+                KNOWLEDGE_RESULT_LIMIT));
+        return PromptConstant.CONVERSATION_KNOWLEDGE_INPUT_PROMPT.formatted(
+                input, JsonUtil.toJsonStrOrThrow(knowledgeBaseIds), results);
     }
 
     /**

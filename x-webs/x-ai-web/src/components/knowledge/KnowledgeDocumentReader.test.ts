@@ -18,6 +18,7 @@ vi.mock('@/api/knowledge', () => ({
 
 const cleanups: (() => void)[] = [];
 const file: KnowledgeDocument = {
+  knowledgeBaseId: 'base-1', knowledgeBaseName: '业务知识',
   path: 'guide.pdf', name: 'guide.pdf', size: 100, contentType: 'application/pdf', updateTime: '',
   status: 'READY', chunkCount: 25, embeddingModel: 'test-embedding', errorMessage: null,
 };
@@ -38,6 +39,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanups.splice(0).forEach((cleanup) => cleanup());
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -74,7 +76,19 @@ describe('knowledge document preview', () => {
     const { container } = mount();
     await vi.waitFor(() => expect(container.querySelector('pre')?.textContent).toContain('<script>'));
     expect(container.querySelector('script, img')).toBeNull();
-    expect(getKnowledgeDocumentPreview).toHaveBeenCalledWith('guide.pdf');
+    expect(getKnowledgeDocumentPreview).toHaveBeenCalledWith('base-1', 'guide.pdf');
+  });
+
+  it('loads the same filename from its newly selected knowledge base', async () => {
+    const { container, currentDocument } = mount();
+    await vi.waitFor(() => expect(container.querySelector('pre')?.textContent).toBe('文档正文'));
+    vi.mocked(getKnowledgeDocumentPreview).mockResolvedValue({
+      path: file.path, name: file.name, content: '另一个知识库的正文', contentType: file.contentType,
+    });
+    currentDocument.value = { ...file, knowledgeBaseId: 'base-2', knowledgeBaseName: '项目知识' };
+    await vi.waitFor(() => expect(container.querySelector('pre')?.textContent).toBe('另一个知识库的正文'));
+    expect(getKnowledgeDocumentPreview).toHaveBeenLastCalledWith('base-2', file.path);
+    expect(container.querySelector('.reader-title')?.textContent).toContain('项目知识');
   });
 
   it('discards an older preview after selecting a different document', async () => {
@@ -96,11 +110,11 @@ describe('knowledge document preview', () => {
     const { container, currentDocument } = mount();
     click(container, '查看原始 PDF');
     await vi.waitFor(() => expect(container.querySelector('iframe')?.getAttribute('src')).toBe('blob:authenticated-pdf'));
-    expect(downloadKnowledgeDocument).toHaveBeenCalledWith('guide.pdf');
+    expect(downloadKnowledgeDocument).toHaveBeenCalledWith('base-1', 'guide.pdf');
     currentDocument.value = { ...file, path: 'new.pdf' };
     await nextTick();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:authenticated-pdf');
-    expect(downloadKnowledgeDocument).toHaveBeenCalledWith('new.pdf');
+    expect(downloadKnowledgeDocument).toHaveBeenCalledWith('base-1', 'new.pdf');
   });
 
   it('loads chunk pages on demand without truncating the displayed chunk content', async () => {
@@ -116,17 +130,37 @@ describe('knowledge document preview', () => {
     await vi.waitFor(() => expect(container.querySelector('.chunk-card pre')?.textContent).toBe('第一个切片'));
     click(container, '下一页');
     await vi.waitFor(() => expect(container.querySelector('.chunk-card pre')?.textContent).toBe('完整切片正文\n第二行'));
-    expect(listKnowledgeDocumentChunks).toHaveBeenLastCalledWith('guide.pdf', 2, 20);
-    expect(container.querySelector('.chunk-card strong')?.textContent).toBe('切片 21');
+    expect(listKnowledgeDocumentChunks).toHaveBeenLastCalledWith('base-1', 'guide.pdf', 2, 20);
+    expect(container.querySelector('.chunk-index')?.textContent).toBe('21');
+    expect(container.querySelector('.chunk-index')?.getAttribute('aria-label')).toBe('切片 21');
   });
 
   it('opens and highlights a search hit beyond the first chunk page', async () => {
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(320);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(100);
     vi.mocked(listKnowledgeDocumentChunks).mockResolvedValue({
       items: [{ index: 23, content: '命中的文档片段', characterCount: 8 }], total: 25, page: 2, size: 20,
     });
     const { container } = mount('chunks', 23);
     await vi.waitFor(() => expect(container.querySelector('.chunk-card.matched pre')?.textContent).toBe('命中的文档片段'));
-    expect(listKnowledgeDocumentChunks).toHaveBeenCalledWith('guide.pdf', 2, 20);
+    expect(container.querySelector('.chunk-card.matched.expanded')).toBeNull();
+    expect(container.querySelector('.chunk-card.matched button')?.getAttribute('aria-expanded')).toBe('false');
+    expect(listKnowledgeDocumentChunks).toHaveBeenCalledWith('base-1', 'guide.pdf', 2, 20);
+  });
+
+  it('provides one large named scroll region per view and returns to the top when changing chunk pages', async () => {
+    const { container } = mount();
+    await vi.waitFor(() => expect(container.querySelector('[aria-label="文档正文滚动区域"] pre')?.textContent).toBe('文档正文'));
+    expect(container.querySelectorAll('.detail-scroll')).toHaveLength(1);
+    click(container, '切片内容');
+    await vi.waitFor(() => expect(container.querySelector('[aria-label="切片内容滚动区域"] .chunk-card')).not.toBeNull());
+    expect(container.querySelectorAll('.detail-scroll')).toHaveLength(1);
+    const scrollRegion = container.querySelector<HTMLElement>('[aria-label="切片内容滚动区域"]')!;
+    scrollRegion.scrollTop = 320;
+    click(container, '下一页');
+    await vi.waitFor(() => expect(listKnowledgeDocumentChunks).toHaveBeenLastCalledWith('base-1', file.path, 2, 20));
+    await nextTick();
+    expect(scrollRegion.scrollTop).toBe(0);
   });
 
   it('renders as a named page region and exposes a back action without a modal drawer', async () => {

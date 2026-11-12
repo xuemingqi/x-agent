@@ -55,12 +55,12 @@ public class RagKnowledgeServiceImpl implements RagKnowledgeService {
     private final KnowledgeEmbeddingProperties embeddingProperties;
 
     @Override
-    public List<KnowledgeDocumentDo> list(String ownerId) {
-        return storage(() -> documents.list(ownerId).stream().map(this::toDocument).toList());
+    public List<KnowledgeDocumentDo> list(String ownerId, String knowledgeBaseId) {
+        return storage(() -> documents.list(ownerId, knowledgeBaseId).stream().map(this::toDocument).toList());
     }
 
     @Override
-    public KnowledgeDocumentDo upload(String ownerId, MultipartFile file) {
+    public KnowledgeDocumentDo upload(String ownerId, String knowledgeBaseId, MultipartFile file) {
         if (file == null || file.isEmpty() || file.getOriginalFilename() == null
                 || file.getSize() > properties.getMaxUploadSizeBytes()) {
             throw new XException(ResponseCodeEnum.AGENT_KNOWLEDGE_INVALID);
@@ -68,7 +68,7 @@ public class RagKnowledgeServiceImpl implements RagKnowledgeService {
         String originalName = file.getOriginalFilename().replace('\\', '/');
         String fileName = originalName.substring(originalName.lastIndexOf('/') + 1);
         try {
-            return upload(ownerId, fileName, file.getBytes());
+            return upload(ownerId, knowledgeBaseId, fileName, file.getBytes());
         } catch (IOException error) {
             log.warn("Failed to read uploaded knowledge document", error);
             throw new XException(ResponseCodeEnum.AGENT_KNOWLEDGE_STORAGE_ERROR);
@@ -76,7 +76,7 @@ public class RagKnowledgeServiceImpl implements RagKnowledgeService {
     }
 
     @Override
-    public KnowledgeDocumentDo upload(String ownerId, String path, byte[] source) {
+    public KnowledgeDocumentDo upload(String ownerId, String knowledgeBaseId, String path, byte[] source) {
         String normalized = validPath(path);
         if (source == null || source.length == 0
                 || source.length > properties.getMaxUploadSizeBytes()) {
@@ -89,22 +89,22 @@ public class RagKnowledgeServiceImpl implements RagKnowledgeService {
         } catch (IllegalArgumentException error) {
             throw new XException(ResponseCodeEnum.AGENT_KNOWLEDGE_INVALID);
         }
-        return storage(() -> index(documents.stage(ownerId, normalized, name, contentType, source)));
+        return storage(() -> index(documents.stage(ownerId, knowledgeBaseId, normalized, name, contentType, source)));
     }
 
     @Override
-    public KnowledgeDownloadDo download(String ownerId, String path) {
+    public KnowledgeDownloadDo download(String ownerId, String knowledgeBaseId, String path) {
         return storage(() -> {
-            KnowledgeDocument document = requireDocument(ownerId, validPath(path), true);
+            KnowledgeDocument document = requireDocument(ownerId, knowledgeBaseId, validPath(path), true);
             return new KnowledgeDownloadDo().setFileName(document.getName()).setContentType(document.getContentType())
                     .setResource(new ByteArrayResource(document.getSource()));
         });
     }
 
     @Override
-    public boolean delete(String ownerId, String path) {
+    public boolean delete(String ownerId, String knowledgeBaseId, String path) {
         return storage(() -> {
-            if (!documents.delete(ownerId, validPath(path))) {
+            if (!documents.delete(ownerId, knowledgeBaseId, validPath(path))) {
                 throw new XException(ResponseCodeEnum.AGENT_KNOWLEDGE_NOT_FOUND);
             }
             return true;
@@ -112,43 +112,47 @@ public class RagKnowledgeServiceImpl implements RagKnowledgeService {
     }
 
     @Override
-    public KnowledgePreviewDo preview(String ownerId, String path) {
+    public KnowledgePreviewDo preview(String ownerId, String knowledgeBaseId, String path) {
         return storage(() -> {
-            KnowledgeDocument document = requireDocument(ownerId, validPath(path), false);
+            KnowledgeDocument document = requireDocument(ownerId, knowledgeBaseId, validPath(path), false);
             return new KnowledgePreviewDo().setPath(document.getPath()).setName(document.getName())
                     .setContent(document.getContent()).setContentType(document.getContentType());
         });
     }
 
     @Override
-    public KnowledgeChunkPageDo chunks(String ownerId, String path, int page, int size) {
+    public KnowledgeChunkPageDo chunks(String ownerId, String knowledgeBaseId, String path, int page, int size) {
         if (page < 1 || size < 1 || size > MAX_CHUNK_PAGE_SIZE) {
             throw new XException(ResponseCodeEnum.AGENT_KNOWLEDGE_INVALID);
         }
         return storage(() -> {
             String normalized = validPath(path);
-            requireDocument(ownerId, normalized, false);
-            return documents.chunks(ownerId, normalized, page, size);
+            requireDocument(ownerId, knowledgeBaseId, normalized, false);
+            return documents.chunks(ownerId, knowledgeBaseId, normalized, page, size);
         });
     }
 
     @Override
-    public KnowledgeDocumentDo reindex(String ownerId, String path) {
+    public KnowledgeDocumentDo reindex(String ownerId, String knowledgeBaseId, String path) {
         return storage(() -> {
-            KnowledgeDocument document = documents.restart(ownerId, validPath(path));
+            KnowledgeDocument document = documents.restart(ownerId, knowledgeBaseId, validPath(path));
             if (document == null) throw new XException(ResponseCodeEnum.AGENT_KNOWLEDGE_NOT_FOUND);
             return index(document);
         });
     }
 
     @Override
-    public List<KnowledgeSearchResultDo> search(String userId, String query, int limit) {
+    public List<KnowledgeSearchResultDo> search(String userId, List<String> knowledgeBaseIds, String query, int limit) {
         if (query == null || query.isBlank() || query.length() > MAX_QUERY_CHARACTERS
                 || limit < 1 || limit > MAX_SEARCH_RESULTS) {
             throw new XException(ResponseCodeEnum.AGENT_KNOWLEDGE_SEARCH_INVALID);
         }
+        if (knowledgeBaseIds == null || knowledgeBaseIds.isEmpty()) return List.of();
+        boolean hasChunks = storage(() -> documents.hasSearchableChunks(userId, knowledgeBaseIds,
+                embeddingProperties.getModel(), embeddingProperties.getDimensions()));
+        if (!hasChunks) return List.of();
         List<Double> embedding = embeddingService.embed(List.of(query.strip())).getFirst();
-        return storage(() -> documents.search(userId, embedding, embeddingProperties.getModel(),
+        return storage(() -> documents.search(userId, knowledgeBaseIds, embedding, embeddingProperties.getModel(),
                 embeddingProperties.getDimensions(), properties.getMinScore(), limit));
     }
 
@@ -183,14 +187,14 @@ public class RagKnowledgeServiceImpl implements RagKnowledgeService {
      * 索引并发被替换时返回最新状态，被删除时保持不存在，禁止复活旧版本。
      */
     private KnowledgeDocumentDo currentDocument(KnowledgeDocument document) {
-        return toDocument(requireDocument(document.getOwnerId(), document.getPath(), false));
+        return toDocument(requireDocument(document.getOwnerId(), document.getKnowledgeBaseId(), document.getPath(), false));
     }
 
     /**
      * 按所有者查找，未找到统一返回不存在，避免泄露其他用户文档。
      */
-    private KnowledgeDocument requireDocument(String ownerId, String path, boolean includeSource) {
-        KnowledgeDocument document = documents.find(ownerId, path, includeSource);
+    private KnowledgeDocument requireDocument(String ownerId, String knowledgeBaseId, String path, boolean includeSource) {
+        KnowledgeDocument document = documents.find(ownerId, knowledgeBaseId, path, includeSource);
         if (document == null) throw new XException(ResponseCodeEnum.AGENT_KNOWLEDGE_NOT_FOUND);
         return document;
     }
@@ -224,7 +228,8 @@ public class RagKnowledgeServiceImpl implements RagKnowledgeService {
      * 持久化快照转换为不含正文与凭据的页面领域对象。
      */
     private KnowledgeDocumentDo toDocument(KnowledgeDocument document) {
-        return new KnowledgeDocumentDo().setPath(document.getPath()).setName(document.getName())
+        return new KnowledgeDocumentDo().setKnowledgeBaseId(document.getKnowledgeBaseId())
+                .setPath(document.getPath()).setName(document.getName())
                 .setSize(document.getSize()).setContentType(document.getContentType())
                 .setUpdateTime(document.getUpdateTime()).setStatus(document.getStatus() == null ? null : document.getStatus().getCode())
                 .setChunkCount(document.getChunkCount()).setEmbeddingModel(document.getEmbeddingModel())

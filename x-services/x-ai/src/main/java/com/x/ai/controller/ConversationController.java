@@ -1,6 +1,8 @@
 package com.x.ai.controller;
 
 import com.x.ai.common.domain.ConversationDo;
+import com.x.ai.common.dto.ConversationKnowledgeDto;
+import jakarta.validation.Valid;
 import com.x.framework.common.constants.CommonConstant;
 import com.x.framework.common.response.BaseResult;
 import com.x.framework.common.response.ResultUtil;
@@ -15,6 +17,8 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -33,8 +37,17 @@ public class ConversationController {
             @Parameter(name = CommonConstant.TOKEN, description = "token", in = ParameterIn.HEADER, required = true)
     })
     @PostMapping
-    public BaseResult<ConversationDo> create() {
-        return ResultUtil.buildResultSuccess(conversationService.create());
+    public BaseResult<ConversationDo> create(@RequestBody(required = false) @Valid ConversationKnowledgeDto request) {
+        return ResultUtil.buildResultSuccess(conversationService.create(
+                request == null ? List.of() : request.getKnowledgeBaseIds()));
+    }
+
+    @Operation(summary = "更新对话关联知识库")
+    @PutMapping("/{sessionId}/knowledge-bases")
+    public BaseResult<ConversationDo> updateKnowledgeBases(@PathVariable String sessionId,
+                                                          @RequestBody @Valid ConversationKnowledgeDto request) {
+        return ResultUtil.buildResultSuccess(conversationService.updateKnowledgeBases(
+                sessionId, request.getKnowledgeBaseIds()));
     }
 
     @Operation(summary = "查询对话列表")

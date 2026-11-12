@@ -14,22 +14,23 @@ public interface KnowledgeDocumentIService {
     /**
      * 查询所有者文档元数据，不读取原文二进制。
      */
-    List<KnowledgeDocument> list(String ownerId);
+    List<KnowledgeDocument> list(String ownerId, String knowledgeBaseId);
 
     /**
      * 按所有者和路径读取文档，未找到时返回 null。
      */
-    KnowledgeDocument find(String ownerId, String path, boolean includeSource);
+    KnowledgeDocument find(String ownerId, String knowledgeBaseId, String path, boolean includeSource);
 
     /**
      * 原子替换原文、使旧索引失效并开始新版本。
      */
-    KnowledgeDocument stage(String ownerId, String path, String name, String contentType, byte[] source);
+    KnowledgeDocument stage(String ownerId, String knowledgeBaseId, String path,
+                            String name, String contentType, byte[] source);
 
     /**
      * 基于数据库当前原文原子开始重建，返回当前版本快照。
      */
-    KnowledgeDocument restart(String ownerId, String path);
+    KnowledgeDocument restart(String ownerId, String knowledgeBaseId, String path);
 
     /**
      * 按版本保存提取正文，向量服务不可用时仍可预览。
@@ -50,16 +51,21 @@ public interface KnowledgeDocumentIService {
     /**
      * 删除所有者文档，切片由外键级联删除。
      */
-    boolean delete(String ownerId, String path);
+    boolean delete(String ownerId, String knowledgeBaseId, String path);
 
     /**
      * 读取指定所有者文档的切片分页。
      */
-    KnowledgeChunkPageDo chunks(String ownerId, String path, int page, int size);
+    KnowledgeChunkPageDo chunks(String ownerId, String knowledgeBaseId, String path, int page, int size);
+
+    /**
+     * 判断所选知识库是否有当前模型可检索的已发布切片，避免空库调用向量服务。
+     */
+    boolean hasSearchableChunks(String ownerId, List<String> knowledgeBaseIds, String model, int dimensions);
 
     /**
      * 在指定用户文档内使用同一模型和维度进行 pgvector 余弦检索。
      */
-    List<KnowledgeSearchResultDo> search(String ownerId, List<Double> embedding, String model,
-                                        int dimensions, double minimumScore, int limit);
+    List<KnowledgeSearchResultDo> search(String ownerId, List<String> knowledgeBaseIds, List<Double> embedding,
+                                        String model, int dimensions, double minimumScore, int limit);
 }

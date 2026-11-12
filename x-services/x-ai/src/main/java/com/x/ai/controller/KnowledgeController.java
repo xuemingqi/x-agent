@@ -48,22 +48,23 @@ public class KnowledgeController {
     @Operation(summary = "查询当前用户知识库文档")
     @Parameters(@Parameter(name = CommonConstant.TOKEN, description = "token", in = ParameterIn.HEADER, required = true))
     @GetMapping
-    public BaseResult<List<KnowledgeDocumentDo>> list() {
-        return ResultUtil.buildResultSuccess(knowledgeService.list());
+    public BaseResult<List<KnowledgeDocumentDo>> list(@RequestParam String knowledgeBaseId) {
+        return ResultUtil.buildResultSuccess(knowledgeService.list(knowledgeBaseId));
     }
 
     @Operation(summary = "上传当前用户知识库文档")
     @Parameters(@Parameter(name = CommonConstant.TOKEN, description = "token", in = ParameterIn.HEADER, required = true))
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public BaseResult<List<KnowledgeDocumentDo>> upload(@RequestPart("files") List<MultipartFile> files) {
-        return ResultUtil.buildResultSuccess(knowledgeService.upload(files));
+    public BaseResult<List<KnowledgeDocumentDo>> upload(@RequestParam String knowledgeBaseId,
+                                                       @RequestPart("files") List<MultipartFile> files) {
+        return ResultUtil.buildResultSuccess(knowledgeService.upload(knowledgeBaseId, files));
     }
 
     @Operation(summary = "下载当前用户知识库文档")
     @Parameters(@Parameter(name = CommonConstant.TOKEN, description = "token", in = ParameterIn.HEADER, required = true))
     @GetMapping("/download")
-    public ResponseEntity<Resource> download(@RequestParam String path) {
-        KnowledgeDownloadDo download = knowledgeService.download(path);
+    public ResponseEntity<Resource> download(@RequestParam String knowledgeBaseId, @RequestParam String path) {
+        KnowledgeDownloadDo download = knowledgeService.download(knowledgeBaseId, path);
         ContentDisposition disposition = ContentDisposition.attachment()
                 .filename(download.getFileName(), StandardCharsets.UTF_8)
                 .build();
@@ -76,34 +77,35 @@ public class KnowledgeController {
     @Operation(summary = "删除当前用户知识库文档")
     @Parameters(@Parameter(name = CommonConstant.TOKEN, description = "token", in = ParameterIn.HEADER, required = true))
     @DeleteMapping
-    public BaseResult<Boolean> delete(@RequestParam String path) {
-        return ResultUtil.buildResultSuccess(knowledgeService.delete(path));
+    public BaseResult<Boolean> delete(@RequestParam String knowledgeBaseId, @RequestParam String path) {
+        return ResultUtil.buildResultSuccess(knowledgeService.delete(knowledgeBaseId, path));
     }
 
     @Operation(summary = "预览知识库文档正文")
     @GetMapping("/preview")
-    public BaseResult<KnowledgePreviewDo> preview(@RequestParam String path) {
-        return ResultUtil.buildResultSuccess(knowledgeService.preview(path));
+    public BaseResult<KnowledgePreviewDo> preview(@RequestParam String knowledgeBaseId, @RequestParam String path) {
+        return ResultUtil.buildResultSuccess(knowledgeService.preview(knowledgeBaseId, path));
     }
 
     @Operation(summary = "分页查看知识库文档切片")
     @GetMapping("/chunks")
-    public BaseResult<KnowledgeChunkPageDo> chunks(@RequestParam String path,
+    public BaseResult<KnowledgeChunkPageDo> chunks(@RequestParam String knowledgeBaseId, @RequestParam String path,
                                                   @RequestParam(defaultValue = "1") @Min(1) int page,
                                                   @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ResultUtil.buildResultSuccess(knowledgeService.chunks(path, page, size));
+        return ResultUtil.buildResultSuccess(knowledgeService.chunks(knowledgeBaseId, path, page, size));
     }
 
     @Operation(summary = "重新解析并索引知识库文档")
     @PostMapping("/reindex")
-    public BaseResult<KnowledgeDocumentDo> reindex(@RequestParam String path) {
-        return ResultUtil.buildResultSuccess(knowledgeService.reindex(path));
+    public BaseResult<KnowledgeDocumentDo> reindex(@RequestParam String knowledgeBaseId, @RequestParam String path) {
+        return ResultUtil.buildResultSuccess(knowledgeService.reindex(knowledgeBaseId, path));
     }
 
     @Operation(summary = "语义检索知识库文档切片")
     @PostMapping("/search")
     public BaseResult<List<KnowledgeSearchResultDo>> search(@RequestBody @Valid KnowledgeSearchDto request) {
-        return ResultUtil.buildResultSuccess(knowledgeService.search(request.getQuery(), request.getLimit()));
+        return ResultUtil.buildResultSuccess(knowledgeService.search(request.getKnowledgeBaseId(),
+                request.getQuery(), request.getLimit()));
     }
 
 }

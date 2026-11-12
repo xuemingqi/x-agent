@@ -17,6 +17,13 @@ import lombok.experimental.Accessors;
 public class KnowledgeSearchDto {
 
     /**
+     * 页面试检索限定的单个知识库 ID。
+     */
+    @NotBlank
+    @Size(max = 160)
+    private String knowledgeBaseId;
+
+    /**
      * 用于匹配文档切片的自然语言问题。
      */
     @NotBlank

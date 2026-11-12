@@ -59,10 +59,10 @@ class RagKnowledgeServiceImplTest {
     @Test
     void vectorFailureKeepsOriginalDocumentAndExtractedPreviewForRetry() {
         byte[] source = "可预览的中文内容".getBytes(StandardCharsets.UTF_8);
-        KnowledgeDocument document = new KnowledgeDocument().setOwnerId("42").setPath("guide.txt")
+        KnowledgeDocument document = new KnowledgeDocument().setOwnerId("42").setKnowledgeBaseId("base-1").setPath("guide.txt")
                 .setName("guide.txt").setSource(source).setContentType("text/plain").setGeneration("version-1");
-        when(documents.stage("42", "guide.txt", "guide.txt", "text/plain", source)).thenReturn(document);
-        when(documents.find("42", "guide.txt", false)).thenReturn(document);
+        when(documents.stage("42", "base-1", "guide.txt", "guide.txt", "text/plain", source)).thenReturn(document);
+        when(documents.find("42", "base-1", "guide.txt", false)).thenReturn(document);
         when(documents.saveContent(eq(document), anyString())).thenAnswer(invocation -> {
             document.setContent(invocation.getArgument(1));
             return true;
@@ -73,38 +73,38 @@ class RagKnowledgeServiceImplTest {
             return null;
         }).when(documents).fail(eq(document), anyString());
 
-        KnowledgeDocumentDo result = service.upload("42", "guide.txt", source);
+        KnowledgeDocumentDo result = service.upload("42", "base-1", "guide.txt", source);
         assertEquals(KnowledgeDocumentStatus.FAILED.getCode(), result.getStatus());
-        assertEquals("可预览的中文内容", service.preview("42", "guide.txt").getContent());
+        assertEquals("可预览的中文内容", service.preview("42", "base-1", "guide.txt").getContent());
         verify(documents, never()).publish(any(), anyString(), any(), any(), anyString(), anyInt());
     }
 
     @Test
     void supersededUploadDoesNotEmbedOrPublishTheOldVersion() {
         byte[] source = "old content".getBytes(StandardCharsets.UTF_8);
-        KnowledgeDocument old = new KnowledgeDocument().setOwnerId("42").setPath("guide.txt")
+        KnowledgeDocument old = new KnowledgeDocument().setOwnerId("42").setKnowledgeBaseId("base-1").setPath("guide.txt")
                 .setName("guide.txt").setSource(source).setGeneration("old");
-        KnowledgeDocument current = new KnowledgeDocument().setOwnerId("42").setPath("guide.txt")
+        KnowledgeDocument current = new KnowledgeDocument().setOwnerId("42").setKnowledgeBaseId("base-1").setPath("guide.txt")
                 .setName("guide.txt").setStatus(KnowledgeDocumentStatus.READY).setChunkCount(2);
-        when(documents.stage("42", "guide.txt", "guide.txt", "text/plain", source)).thenReturn(old);
+        when(documents.stage("42", "base-1", "guide.txt", "guide.txt", "text/plain", source)).thenReturn(old);
         when(documents.saveContent(old, "old content")).thenReturn(false);
-        when(documents.find("42", "guide.txt", false)).thenReturn(current);
+        when(documents.find("42", "base-1", "guide.txt", false)).thenReturn(current);
 
-        assertEquals(2, service.upload("42", "guide.txt", source).getChunkCount());
+        assertEquals(2, service.upload("42", "base-1", "guide.txt", source).getChunkCount());
         verifyNoInteractions(embeddings);
         verify(documents, never()).publish(any(), anyString(), any(), any(), anyString(), anyInt());
     }
 
     @Test
     void privateAccessUsesTheRequestedOwnerAtEveryReadBoundary() {
-        assertThrows(XException.class, () -> service.preview("other-user", "private.txt"));
-        assertThrows(XException.class, () -> service.download("other-user", "private.txt"));
-        assertThrows(XException.class, () -> service.chunks("other-user", "private.txt", 1, 20));
-        assertThrows(XException.class, () -> service.reindex("other-user", "private.txt"));
-        assertThrows(XException.class, () -> service.delete("other-user", "private.txt"));
-        verify(documents).find("other-user", "private.txt", true);
-        verify(documents).restart("other-user", "private.txt");
-        verify(documents).delete("other-user", "private.txt");
+        assertThrows(XException.class, () -> service.preview("other-user", "base-1", "private.txt"));
+        assertThrows(XException.class, () -> service.download("other-user", "base-1", "private.txt"));
+        assertThrows(XException.class, () -> service.chunks("other-user", "base-1", "private.txt", 1, 20));
+        assertThrows(XException.class, () -> service.reindex("other-user", "base-1", "private.txt"));
+        assertThrows(XException.class, () -> service.delete("other-user", "base-1", "private.txt"));
+        verify(documents).find("other-user", "base-1", "private.txt", true);
+        verify(documents).restart("other-user", "base-1", "private.txt");
+        verify(documents).delete("other-user", "base-1", "private.txt");
         verifyNoInteractions(embeddings);
     }
 
@@ -112,21 +112,30 @@ class RagKnowledgeServiceImplTest {
     void semanticSearchOnlyReceivesTheCurrentUser() {
         List<Double> vector = List.of(1.0, 0.1);
         when(embeddings.embed(List.of("退款规则"))).thenReturn(List.of(vector));
-        when(documents.search(any(), any(), anyString(), anyInt(), anyDouble(), anyInt())).thenReturn(List.of());
-        service.search("42", "退款规则", 5);
-        verify(documents).search(eq("42"), eq(vector), anyString(), anyInt(), anyDouble(), eq(5));
+        when(documents.hasSearchableChunks(eq("42"), eq(List.of("base-1")), anyString(), anyInt())).thenReturn(true);
+        when(documents.search(any(), any(), any(), anyString(), anyInt(), anyDouble(), anyInt())).thenReturn(List.of());
+        service.search("42", List.of("base-1"), "退款规则", 5);
+        verify(documents).search(eq("42"), eq(List.of("base-1")), eq(vector), anyString(), anyInt(), anyDouble(), eq(5));
+    }
+
+    @Test
+    void emptySelectionAndEmptyKnowledgeBasesDoNotCallEmbeddingService() {
+        assertEquals(List.of(), service.search("42", List.of(), "问题", 5));
+        assertEquals(List.of(), service.search("42", List.of("empty-base"), "问题", 5));
+        verifyNoInteractions(embeddings);
+        verify(documents, never()).search(any(), any(), any(), anyString(), anyInt(), anyDouble(), anyInt());
     }
 
     @Test
     void rejectsUnsafePathsInvalidPaginationAndUnsupportedFilesBeforePersistence() {
         for (String path : List.of("../other.txt", "/other.txt", "nested/../other.txt", "nested//other.txt", "C:/other.txt")) {
-            assertThrows(XException.class, () -> service.download("42", path));
+            assertThrows(XException.class, () -> service.download("42", "base-1", path));
         }
-        assertThrows(XException.class, () -> service.chunks("42", "valid.txt", 0, 20));
-        assertThrows(XException.class, () -> service.chunks("42", "valid.txt", 1, 101));
-        assertThrows(XException.class, () -> service.upload("42", "program.exe", new byte[]{1}));
-        assertThrows(XException.class, () -> service.search("42", " ", 5));
-        assertThrows(XException.class, () -> service.search("42", "退款规则", 21));
+        assertThrows(XException.class, () -> service.chunks("42", "base-1", "valid.txt", 0, 20));
+        assertThrows(XException.class, () -> service.chunks("42", "base-1", "valid.txt", 1, 101));
+        assertThrows(XException.class, () -> service.upload("42", "base-1", "program.exe", new byte[]{1}));
+        assertThrows(XException.class, () -> service.search("42", List.of("base-1"), " ", 5));
+        assertThrows(XException.class, () -> service.search("42", List.of("base-1"), "退款规则", 21));
         verifyNoInteractions(documents, embeddings);
     }
 }

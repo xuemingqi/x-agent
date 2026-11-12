@@ -24,67 +24,92 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function mountCards() {
-  const chunks = ref([
-    { index: 1, content: '第一段原文\n保留完整内容', characterCount: 13 },
-    { index: 2, content: '第二段原文\n保留完整内容', characterCount: 13 },
-  ]);
+async function mountCards(initialMatchedIndex?: number, contents = ['第一段原文\n保留完整内容', '第二段原文\n保留完整内容']) {
+  const matchedIndex = ref(initialMatchedIndex);
+  const chunks = ref(contents.map((content, index) => ({ index: index + 1, content, characterCount: content.length })));
   const container = document.createElement('div');
   const app = createApp({ render: () => h('div', chunks.value.map((chunk) => h(KnowledgeChunkCard, {
-    key: chunk.index, chunk, matched: chunk.index === 1,
+    key: chunk.index, chunk, matched: chunk.index === matchedIndex.value,
   }))) });
   app.component('el-icon', defineComponent({ setup: (_, { slots }) => () => h('span', slots.default?.()) }));
   app.mount(container);
   const unmount = () => app.unmount();
   cleanups.push(unmount);
   await nextTick();
-  return { container, chunks, unmount };
+  return { container, chunks, matchedIndex, unmount };
 }
 
-describe('knowledge chunk folding', () => {
-  it('expands overflowing cards independently while retaining the source and match marker', async () => {
-    vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(240);
-    const { container } = await mountCards();
-    const buttons = container.querySelectorAll<HTMLButtonElement>('.chunk-expand');
-    expect(buttons).toHaveLength(2);
-    expect([...buttons].map((button) => button.getAttribute('aria-expanded'))).toEqual(['false', 'false']);
-    expect(buttons[0]!.getAttribute('aria-controls')).not.toBe(buttons[1]!.getAttribute('aria-controls'));
-
-    buttons[0]!.click();
-    await nextTick();
-    expect(buttons[0]!.getAttribute('aria-expanded')).toBe('true');
-    expect(buttons[1]!.getAttribute('aria-expanded')).toBe('false');
+describe('knowledge chunk single-line rows', () => {
+  it('folds every row initially, including a hit, and expands full source independently', async () => {
+    const { container } = await mountCards(1);
+    const rows = container.querySelectorAll<HTMLButtonElement>('button.chunk-row');
+    expect(rows).toHaveLength(2);
+    expect([...rows].map((row) => row.getAttribute('aria-expanded'))).toEqual(['false', 'false']);
+    expect(rows[0]!.getAttribute('aria-controls')).not.toBe(rows[1]!.getAttribute('aria-controls'));
+    expect(container.querySelector('.chunk-preview')?.textContent).toBe('第一段原文 保留完整内容');
     expect(container.querySelector('.chunk-card.matched pre')?.textContent).toBe('第一段原文\n保留完整内容');
+    expect(container.querySelector<HTMLElement>('.chunk-content')?.style.display).toBe('none');
 
-    buttons[0]!.click();
+    rows[0]!.click();
     await nextTick();
-    expect(container.querySelector('.chunk-card.expanded')).toBeNull();
+    expect(rows[0]!.getAttribute('aria-expanded')).toBe('true');
+    expect(rows[1]!.getAttribute('aria-expanded')).toBe('false');
+    expect(container.querySelector<HTMLElement>('.chunk-card.expanded .chunk-content')?.style.display).not.toBe('none');
+    rows[1]!.click();
+    await nextTick();
+    rows[0]!.click();
+    await nextTick();
+    expect(rows[0]!.getAttribute('aria-expanded')).toBe('false');
+    expect(rows[1]!.getAttribute('aria-expanded')).toBe('true');
   });
 
-  it('only offers expansion after overflow and resets folding when the content changes', async () => {
-    const height = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(72);
-    const { container, chunks, unmount } = await mountCards();
-    expect(container.querySelector('.chunk-expand')).toBeNull();
+  it('highlights a newly matched row without automatically expanding it', async () => {
+    const { container, matchedIndex } = await mountCards();
+    matchedIndex.value = 2;
+    await nextTick();
+    await nextTick();
+    expect(container.querySelector('.chunk-card.matched.expanded')).toBeNull();
+    expect(container.querySelector('.chunk-card.matched button')?.getAttribute('aria-expanded')).toBe('false');
+    expect(container.querySelector('.chunk-card.matched pre')?.textContent).toBe('第二段原文\n保留完整内容');
+  });
 
-    height.mockReturnValue(240);
+  it('only offers expansion for overflowing or multiline text and remeasures on resize', async () => {
+    const width = vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(100);
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(300);
+    const { container, chunks, unmount } = await mountCards(undefined, ['简短文本', '另一段短文']);
+    expect(container.querySelector('button.chunk-row')).toBeNull();
+    expect(container.querySelector('.chunk-toggle')).toBeNull();
+
+    width.mockReturnValue(500);
     resizeCallbacks.forEach((callback) => callback());
     await nextTick();
-    container.querySelector<HTMLButtonElement>('.chunk-expand')!.click();
+    const row = container.querySelector<HTMLButtonElement>('button.chunk-row')!;
+    expect(row).not.toBeNull();
+    row.click();
     await nextTick();
-    expect(container.querySelector('.chunk-card.expanded')).not.toBeNull();
-
+    expect(row.getAttribute('aria-expanded')).toBe('true');
     chunks.value[0] = { index: 1, content: '刷新后的原文', characterCount: 7 };
     await nextTick();
     await nextTick();
     expect(container.querySelector('.chunk-card.expanded')).toBeNull();
     expect(container.querySelector('.chunk-card pre')?.textContent).toBe('刷新后的原文');
 
-    height.mockReturnValue(72);
+    width.mockReturnValue(100);
     resizeCallbacks.forEach((callback) => callback());
     await nextTick();
-    expect(container.querySelector('.chunk-expand')).toBeNull();
+    expect(container.querySelector('button.chunk-row')).toBeNull();
     unmount();
     cleanups.pop();
-    expect(disconnect).toHaveBeenCalledTimes(2);
+    expect(disconnect).toHaveBeenCalled();
+  });
+
+  it('keeps markup as source text in the one-line preview and expanded content', async () => {
+    const text = '<script>stealToken()</script>\n<img src=x onerror=stealToken()>';
+    const { container } = await mountCards(undefined, [text]);
+    expect(container.querySelector('.chunk-preview')?.textContent).toContain('<script>');
+    container.querySelector<HTMLButtonElement>('button.chunk-row')!.click();
+    await nextTick();
+    expect(container.querySelector('.chunk-content pre')?.textContent).toBe(text);
+    expect(container.querySelector('script, img, [onerror]')).toBeNull();
   });
 });

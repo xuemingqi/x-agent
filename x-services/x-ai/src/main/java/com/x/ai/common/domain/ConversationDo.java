@@ -17,6 +17,12 @@ public class ConversationDo {
     @Schema(name = "title", description = "首条用户消息")
     private String title;
 
+    /**
+     * 对话额外关联的知识库 ID；个人公共知识库始终自动关联。
+     */
+    @Schema(description = "额外关联的知识库 ID")
+    private List<String> knowledgeBaseIds;
+
     @Schema(name = "createdAt", description = "对话创建时间")
     private String createdAt;
 

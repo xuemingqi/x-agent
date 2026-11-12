@@ -16,7 +16,7 @@ public interface KnowledgeService {
      *
      * @return 文档列表
      */
-    List<KnowledgeDocumentDo> list();
+    List<KnowledgeDocumentDo> list(String knowledgeBaseId);
 
     /**
      * 上传文档到当前用户知识库，重名文件直接替换。
@@ -24,7 +24,7 @@ public interface KnowledgeService {
      * @param files 上传文件
      * @return 已上传文档
      */
-    List<KnowledgeDocumentDo> upload(List<MultipartFile> files);
+    List<KnowledgeDocumentDo> upload(String knowledgeBaseId, List<MultipartFile> files);
 
     /**
      * 下载当前用户知识库中的指定文档。
@@ -32,7 +32,7 @@ public interface KnowledgeService {
      * @param path 用户知识库相对路径
      * @return 下载资源
      */
-    KnowledgeDownloadDo download(String path);
+    KnowledgeDownloadDo download(String knowledgeBaseId, String path);
 
     /**
      * 删除当前用户知识库中的指定文档。
@@ -40,25 +40,25 @@ public interface KnowledgeService {
      * @param path 用户知识库相对路径
      * @return 是否删除成功
      */
-    boolean delete(String path);
+    boolean delete(String knowledgeBaseId, String path);
 
     /**
      * 预览经过解析的文档正文。
      */
-    KnowledgePreviewDo preview(String path);
+    KnowledgePreviewDo preview(String knowledgeBaseId, String path);
 
     /**
      * 分页查看文档切片。
      */
-    KnowledgeChunkPageDo chunks(String path, int page, int size);
+    KnowledgeChunkPageDo chunks(String knowledgeBaseId, String path, int page, int size);
 
     /**
      * 重新解析并索引文档，用于失败重试或模型切换。
      */
-    KnowledgeDocumentDo reindex(String path);
+    KnowledgeDocumentDo reindex(String knowledgeBaseId, String path);
 
     /**
      * 在当前知识库作用域内执行语义检索。
      */
-    List<KnowledgeSearchResultDo> search(String query, int limit);
+    List<KnowledgeSearchResultDo> search(String knowledgeBaseId, String query, int limit);
 }
