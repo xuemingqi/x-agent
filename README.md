@@ -94,6 +94,9 @@ mysql -h 127.0.0.1 -u root -p x_agent < config/sql/x-agent-init.sql
 
 SQL 包含用户、AI、MCP、Skill 和 Quartz 表，无私人模型、Key、会话或默认账号。不要把初始化包重复应用到已有数据库；增量升级应单独审核。数据库名称应与 `.env` 中的 `MYSQL_DATABASE` 一致。
 
+动态智能应用使用 MinIO 保存完整应用包，MySQL 保存应用目录、版本和对象引用；已有环境部署前先执行
+`config/sql/20261112-dynamic-agent-apps.sql`。创建方式、浏览器运行约定与 SDK 见 [动态智能应用](docs/dynamic-apps.md)。
+
 生成首个普通用户的 INSERT（交互输入密码，不会输出明文密码）：
 
 ```bash

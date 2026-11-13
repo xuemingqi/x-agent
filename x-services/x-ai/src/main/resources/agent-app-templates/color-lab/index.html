@@ -1,0 +1,39 @@
+<section class="color-lab" aria-label="AI 配色实验室">
+  <header class="lab-heading">
+    <div><p class="eyebrow">把灵感变成颜色</p><h1>AI 配色实验室</h1><p>从一句描述开始，在真实组件中找到适合你的配色。</p></div>
+    <div class="export-actions"><button id="export-css" type="button">复制 CSS</button><button id="export-json" type="button">复制 JSON</button></div>
+  </header>
+  <p id="error" class="message error" role="alert" hidden></p>
+  <p id="notice" class="message" role="status" aria-live="polite"></p>
+  <div class="lab-layout">
+    <aside class="controls">
+      <form id="generation-form">
+        <fieldset id="generation-controls">
+          <legend>描述你的灵感</legend>
+          <label for="inspiration">配色描述</label>
+          <textarea id="inspiration" rows="4" maxlength="3000">雨后的森林，安静、清新，带一点温暖</textarea>
+          <div class="presets"><button type="button" data-preset="雨后的森林，安静、清新">雨后森林</button><button type="button" data-preset="落日海岸，温暖、松弛">落日海岸</button><button type="button" data-preset="午夜城市，霓虹、鲜明">午夜城市</button></div>
+          <div class="options"><label><input id="dark-mode" type="checkbox">深色界面</label><label><input id="vivid-mode" type="checkbox">鲜明饱和</label></div>
+          <button id="generate" class="primary-button" type="submit">生成配色</button>
+          <p class="control-note">使用你的默认模型。锁定的颜色会保留，可在下方手动微调。</p>
+        </fieldset>
+      </form>
+      <fieldset id="palette-controls"><legend>七个界面色位</legend><div id="color-fields"></div></fieldset>
+    </aside>
+    <div class="results">
+      <div class="preview-heading"><div><h2>组件预览</h2><p id="theme-source">初始示例</p></div><button id="pin-current" type="button" aria-pressed="false">固定当前方案作比较</button></div>
+      <div id="preview-grid" class="preview-grid">
+        <article id="baseline-frame" class="theme-frame" hidden><p id="baseline-caption" class="theme-caption"></p><div id="baseline-preview" class="theme-preview"></div></article>
+        <article class="theme-frame"><p id="current-caption" class="theme-caption" hidden></p><div id="current-preview" class="theme-preview"></div></article>
+      </div>
+      <section class="theme-summary"><div><h2 id="theme-name">雨后森林</h2><p id="theme-description"></p></div><div id="mini-palette" class="mini-palette" aria-label="当前七个配色"></div></section>
+      <section class="contrast-panel">
+        <div class="contrast-heading"><div><h2>文字可读性 <span id="contrast-summary"></span></h2><p>按当前色值实时计算，普通文字对比度目标 ≥ 4.5:1。</p></div><button id="improve-readability" type="button">优化可读性</button></div>
+        <div id="contrast-checks" class="contrast-checks"></div>
+        <p id="contrast-note" class="control-note" hidden>部分文字对比度不足。可手动调色或让 AI 优化；锁定颜色可能限制优化结果。</p>
+      </section>
+      <section class="history-panel"><div class="history-heading"><h2>最近方案</h2><p>保留最近 6 个，刷新后可继续使用。</p></div><div id="history-list" class="history-list"></div><p id="empty-history" class="control-note">生成新配色后会出现在这里。</p></section>
+      <details id="export-panel" class="export-panel"><summary>查看并导出当前配色</summary><label for="export-content">导出内容</label><textarea id="export-content" rows="11" readonly spellcheck="false"></textarea><p class="control-note">浏览器不允许自动复制时，可在文本框中手动复制。</p></details>
+    </div>
+  </div>
+</section>

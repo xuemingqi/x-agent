@@ -9,6 +9,7 @@ import ChatTimeline from '@/components/chat/ChatTimeline.vue';
 import FileHtmlPreview from '@/components/file/FileHtmlPreview.vue';
 import { useChatStore } from '@/stores/chat';
 import { useModelSettingStore } from '@/stores/model-setting';
+import { consumeApplicationChatRequest } from '@/utils/app-chat';
 
 const route = useRoute();
 const router = useRouter();
@@ -46,17 +47,37 @@ function togglePreview(): void {
 
 onMounted(loadRouteConversation);
 watch(sessionId, loadRouteConversation);
+watch(() => route.query.appRequest, (request) => {
+  if (typeof request === 'string') void loadRouteConversation();
+});
+watch(() => modelSetting.configured, (configured) => {
+  if (configured && typeof route.query.appRequest === 'string') void loadRouteConversation();
+});
+
+let routeLoadSequence = 0;
 
 async function loadRouteConversation(): Promise<void> {
+  const sequence = ++routeLoadSequence;
   try {
     await chat.initialize();
+    if (sequence !== routeLoadSequence) return;
     if (!sessionId.value) {
       chat.closeConversation();
-      return;
-    }
-    if (sessionId.value !== chat.currentSessionId) {
+    } else if (sessionId.value !== chat.currentSessionId) {
       await chat.openConversation(sessionId.value);
     }
+    if (sequence !== routeLoadSequence) return;
+    const token = route.query.appRequest;
+    if (typeof token !== 'string') return;
+    if (!modelSetting.configured) {
+      modelSetting.openDialog();
+      return;
+    }
+    const prompt = consumeApplicationChatRequest(token);
+    const query = { ...route.query };
+    delete query.appRequest;
+    await router.replace({ path: route.path, query });
+    if (prompt) await send(prompt);
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '加载会话失败');
   }

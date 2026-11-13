@@ -11,6 +11,7 @@ import { useChatStore } from '@/stores/chat';
 import { useModelSettingStore } from '@/stores/model-setting';
 import type { Conversation } from '@/types/chat';
 import ChatView from './ChatView.vue';
+import { createApplicationChatRoute } from '@/utils/app-chat';
 
 vi.mock('@/api/conversation', () => ({
   createConversation: vi.fn(), getConversation: vi.fn(), listConversations: vi.fn(),
@@ -46,7 +47,26 @@ beforeEach(() => {
     onEvent({ eventType: 'task_end', taskId: 'task-1', sessionId: request.sessionId, userId: 'user-1', structuredData: {} });
   });
 });
-afterEach(() => cleanups.splice(0).forEach((cleanup) => cleanup()));
+afterEach(() => {
+  cleanups.splice(0).forEach((cleanup) => cleanup());
+  sessionStorage.clear();
+});
+
+describe('application creation handoff', () => {
+  it('starts the locally requested application task once and removes the handoff from the URL', async () => {
+    const route = createApplicationChatRoute('请创建一个可保存待办事项的应用');
+    const { router } = await mountView(`/chat?appRequest=${route.query.appRequest}`);
+
+    await vi.waitFor(() => expect(streamChat).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(streamChat).mock.calls[0][0].request).toBe('请创建一个可保存待办事项的应用');
+    expect(router.currentRoute.value.query.appRequest).toBeUndefined();
+  });
+
+  it('does not execute a prompt supplied only through an external URL', async () => {
+    await mountView('/chat?appRequest=external-token&prompt=untrusted');
+    expect(streamChat).not.toHaveBeenCalled();
+  });
+});
 
 describe('chat knowledge source selection', () => {
   it('shows automatic common knowledge and creates the first conversation with multiple selected sources', async () => {
@@ -137,7 +157,7 @@ async function mountView(path: string) {
   app.mount(container);
   cleanups.push(() => { app.unmount(); container.remove(); });
   await settle();
-  return { container, chat: useChatStore(pinia) };
+  return { container, chat: useChatStore(pinia), router };
 }
 
 async function openPicker(container: HTMLElement): Promise<void> {

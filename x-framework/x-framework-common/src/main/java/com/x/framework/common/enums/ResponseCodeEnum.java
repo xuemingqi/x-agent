@@ -97,12 +97,15 @@ public enum ResponseCodeEnum {
     AGENT_CONVERSATION_IMAGE_INVALID(HttpStatus.BAD_REQUEST, 15122, "图片无效或超过大小限制，请使用 PNG、JPEG、GIF 或 WebP 图片！"),
     AGENT_MODEL_IMAGE_HOST_DENIED(HttpStatus.BAD_GATEWAY, 15123, "模型图片地址未配置为可信域名，请配置 agent.multimodal.image-hosts！"),
     AGENT_MODEL_IMAGE_DOWNLOAD_ERROR(HttpStatus.BAD_GATEWAY, 15124, "模型图片下载失败！"),
-    AGENT_APP_GENERATION_ERROR(HttpStatus.BAD_GATEWAY, 15125, "应用生成失败，请检查模型是否支持结构化输出，或稍后重试！"),
-    AGENT_APP_OUTPUT_INVALID(HttpStatus.BAD_GATEWAY, 15126, "模型返回的应用结果不完整或格式无效，请重试！"),
-    AGENT_APP_REGISTRATION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, 15127, "智能应用注册失败，应用标识无效或重复！"),
-    HTTP_LAB_REQUEST_INVALID(HttpStatus.BAD_REQUEST, 15128, "HTTP 请求配置无效，请检查地址、请求头和参数！"),
-    HTTP_LAB_NOT_FOUND(HttpStatus.NOT_FOUND, 15129, "请求或运行记录不存在、已过期，或不属于当前用户！"),
-    HTTP_LAB_BUSY(HttpStatus.TOO_MANY_REQUESTS, 15130, "已有运行中的任务或执行资源已满，请稍后重试！");
+    OUTBOUND_HTTP_REQUEST_INVALID(HttpStatus.BAD_REQUEST, 15128, "HTTP 请求配置无效，请检查地址、请求头和参数！"),
+    OUTBOUND_HTTP_BUSY(HttpStatus.TOO_MANY_REQUESTS, 15130, "HTTP 执行资源已满，请稍后重试！"),
+    AGENT_APP_NOT_FOUND(HttpStatus.NOT_FOUND, 15131, "智能应用不存在或不属于当前用户！"),
+    AGENT_APP_VERSION_CONFLICT(HttpStatus.CONFLICT, 15132, "应用版本已变化，请刷新后重试！"),
+    AGENT_APP_PACKAGE_INVALID(HttpStatus.BAD_REQUEST, 15133, "应用包无效或超过大小限制！"),
+    AGENT_APP_STORAGE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, 15134, "智能应用文件存储失败！"),
+    AGENT_APP_PERMISSION_DENIED(HttpStatus.FORBIDDEN, 15135, "当前应用未声明此能力！"),
+    AGENT_APP_DATA_INVALID(HttpStatus.BAD_REQUEST, 15136, "应用数据的键或内容无效、或超过大小限制！"),
+    AGENT_APP_EXECUTION_ERROR(HttpStatus.BAD_GATEWAY, 15137, "应用执行失败，请检查模型或 MCP 配置后重试！");
 
     private final HttpStatus httpStatus;
     private final Integer code;

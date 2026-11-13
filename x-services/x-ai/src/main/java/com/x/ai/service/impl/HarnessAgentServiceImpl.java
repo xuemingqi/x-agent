@@ -26,6 +26,7 @@ import com.x.ai.service.ResourceEnablementService;
 import com.x.ai.service.SkillRuntimeService;
 import com.x.ai.skill.SkillRuntimeWorkspace;
 import com.x.ai.tool.AgentScheduleTools;
+import com.x.ai.tool.AgentAppManagementTools;
 import com.x.ai.tool.BrowserScreenshotTools;
 import com.x.ai.tool.ConversationFileTools;
 import com.x.ai.tool.KnowledgeLinkManagementTools;
@@ -125,6 +126,8 @@ public class HarnessAgentServiceImpl implements HarnessAgentService, AutoCloseab
     private final SkillRuntimeService skillRuntimeService;
 
     private final ObjectProvider<SkillManagementTools> skillManagementTools;
+
+    private final ObjectProvider<AgentAppManagementTools> agentAppManagementTools;
 
     private final McpRuntimeService mcpRuntimeService;
 
@@ -263,6 +266,7 @@ public class HarnessAgentServiceImpl implements HarnessAgentService, AutoCloseab
         toolkit.registerTool(mcpServerTools.getObject());
         toolkit.registerTool(knowledgeLinkManagementTools.getObject());
         toolkit.registerTool(skillManagementTools.getObject());
+        toolkit.registerTool(agentAppManagementTools.getObject());
         return toolkit;
     }
 

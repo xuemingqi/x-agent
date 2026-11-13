@@ -220,6 +220,53 @@ CREATE TABLE IF NOT EXISTS agent_user_skill_resource (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='个人 Skill 附件';
 
 
+-- Application source packages are immutable private MinIO objects; MySQL stores references only.
+CREATE TABLE IF NOT EXISTS agent_app
+(
+    id              varchar(64)                            not null comment '个人应用 ID' primary key,
+    owner_user_id   varchar(128)                           not null comment '所属用户 ID',
+    name            varchar(100)                           not null comment '当前发布版本的应用名称',
+    description     varchar(1000)                          not null comment '当前发布版本的应用介绍',
+    current_version varchar(64)                            not null comment '当前发布版本 ID',
+    deleted         tinyint(1) default 0                    not null comment '是否进入删除流程，失败时保留对象引用供重试',
+    create_time     datetime default CURRENT_TIMESTAMP     not null comment '创建时间',
+    update_time     datetime default CURRENT_TIMESTAMP     not null on update CURRENT_TIMESTAMP comment '更新时间',
+    index idx_agent_app_owner_update (owner_user_id, deleted, update_time),
+    constraint chk_agent_app_deleted check (deleted in (0, 1))
+)
+    comment '用户动态智能应用目录' collate = utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS agent_app_version
+(
+    id          varchar(64)                            not null comment '不可变应用版本 ID' primary key,
+    app_id      varchar(64)                            not null comment '所属应用 ID',
+    name        varchar(100)                           not null comment '发布时的应用名称',
+    description varchar(1000)                          not null comment '发布时的应用介绍',
+    object_key  varchar(1024)                          not null comment 'MinIO 私有应用包对象键',
+    size_bytes  bigint                                 not null comment '应用包 UTF-8 字节数',
+    sha256      char(64) charset ascii collate ascii_bin not null comment '应用包 SHA-256 摘要',
+    create_time datetime default CURRENT_TIMESTAMP     not null comment '版本创建时间',
+    index idx_agent_app_version_app_time (app_id, create_time),
+    constraint fk_agent_app_version_app foreign key (app_id) references agent_app (id) on delete cascade
+)
+    comment '智能应用不可变版本及对象存储引用' collate = utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS agent_app_data
+(
+    id            bigint                                  not null comment '应用数据记录 ID' primary key,
+    owner_user_id varchar(128)                            not null comment '数据所属用户 ID',
+    app_id        varchar(64)                             not null comment '数据所属应用 ID',
+    data_key      varchar(128)                            not null comment '应用内部的数据键，区分大小写',
+    value_json    mediumtext                              not null comment '应用保存的 JSON 值，最大 1 MiB',
+    create_time   datetime default CURRENT_TIMESTAMP      not null comment '创建时间',
+    update_time   datetime default CURRENT_TIMESTAMP      not null on update CURRENT_TIMESTAMP comment '更新时间',
+    constraint uk_agent_app_data_owner_app_key unique (owner_user_id, app_id, data_key),
+    index idx_agent_app_data_app (app_id),
+    constraint fk_agent_app_data_app foreign key (app_id) references agent_app (id) on delete cascade
+)
+    comment '用户应用隔离的数据存储' collate = utf8mb4_bin;
+
+
 -- Source: x-services/x-ai/src/main/resources/db/mcp-schema.sql
 CREATE TABLE IF NOT EXISTS agent_mcp_server
 (

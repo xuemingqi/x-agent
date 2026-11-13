@@ -6,11 +6,11 @@ import lombok.experimental.Accessors;
 
 @Data
 @Accessors(chain = true)
-@Schema(description = "代码注册的智能应用")
+@Schema(description = "智能应用目录项")
 public class AgentAppDo {
 
     /**
-     * 稳定的应用标识，同时作为前端页面注册键。
+     * 当前用户个人应用的 UUID 标识。
      */
     @Schema(description = "应用标识")
     private String id;
@@ -26,4 +26,9 @@ public class AgentAppDo {
      */
     @Schema(description = "应用介绍")
     private String description;
+
+    /**
+     * 当前发布版本的 UUID 标识。
+     */
+    private String currentVersion;
 }

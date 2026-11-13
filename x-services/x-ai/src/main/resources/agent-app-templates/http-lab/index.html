@@ -1,0 +1,18 @@
+<section class="http-application">
+  <header class="intro"><div><p class="eyebrow">请求与测量</p><h1>HTTP 请求实验室</h1><p>浏览器负责调度，通用 HTTP 能力从应用服务器发出请求。</p></div><span class="transport-label">真实 HTTP 响应</span></header>
+  <p id="error" class="error" role="alert" hidden></p>
+  <div class="workspace">
+    <aside class="requests"><div class="section-title"><h2>请求草稿</h2><button id="add-request" type="button">新建</button></div><div id="drafts"></div><button id="save-drafts" type="button">保存草稿</button><p id="saved" role="status"></p><p class="hint">手动保存到个人应用数据，包含配置的请求头；不保存响应正文。</p></aside>
+    <main>
+      <div class="request-name"><input id="request-name" aria-label="请求名称" maxlength="100" placeholder="请求名称"><button id="remove-request" type="button">移除</button></div>
+      <div class="address"><select id="method" aria-label="HTTP 方法"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>HEAD</option><option>OPTIONS</option></select><input id="url" aria-label="请求地址" type="url" placeholder="https://example.com/api"><button id="send" class="primary" type="button">发送请求</button></div>
+      <div class="request-settings"><label>总超时 <input id="timeout" aria-label="超时毫秒" type="number" min="100" max="30000" value="10000"> ms</label><span>仅发送显式配置的请求头，不继承平台登录凭据。</span></div>
+      <details open><summary>查询参数</summary><div id="query-fields"></div><button id="add-query" type="button">添加参数</button></details>
+      <details><summary>请求头</summary><div id="header-fields"></div><button id="add-header" type="button">添加请求头</button></details>
+      <label class="body-label">请求正文<textarea id="body" aria-label="请求正文" rows="5" spellcheck="false" placeholder="UTF-8 原始正文；GET / HEAD 不发送正文"></textarea></label>
+      <section class="result-section"><div class="section-title"><h2>响应</h2><p id="response-status" role="status">尚未发送请求</p></div><p id="response-change" class="hint"></p><details><summary>响应头</summary><pre id="response-headers">—</pre></details><pre id="response-body" class="response-body">发送请求后在这里查看响应正文。</pre></section>
+      <section class="load-section"><div class="section-title"><h2>性能测量</h2><span id="load-state">尚未开始</span></div><p class="hint">浏览器按配置限速；达到并发上限时跳过时隙。离开页面会停止调度，并取消在途 SDK 请求。</p><div class="load-controls"><label>并发 <input id="concurrency" type="number" min="1" max="20" value="5"></label><label>时长 / 秒 <input id="duration" type="number" min="1" max="120" value="10"></label><label>每秒上限 <input id="rate" type="number" min="1" max="100" value="10"></label><button id="start-load" class="primary" type="button">开始测量</button><button id="stop-load" type="button" disabled>停止</button></div><progress id="load-progress" max="100" value="0"></progress><div id="load-metrics" class="metrics"></div><p id="load-summary" class="hint"></p><details><summary>每秒统计</summary><div class="table-scroll"><table><thead><tr><th>秒</th><th>完成</th><th>失败</th><th>平均 / ms</th></tr></thead><tbody id="timeline"></tbody></table></div></details></section>
+      <section class="analysis-section"><div class="section-title"><h2>AI 分析</h2><select id="analysis-target" aria-label="分析对象"><option value="request">当前请求配置</option><option value="response">上次调试结果</option><option value="load">本轮测量结果</option></select></div><label>关注的问题<input id="question" maxlength="2000" placeholder="例如：错误主要集中在哪些状态码？"></label><p class="hint">点击分析会将所选快照发送给个人默认模型。超长正文只提供前缀，分析不另行访问目标。</p><button id="analyze" type="button">分析所选快照</button><div id="analysis" class="analysis-output" role="status"></div></section>
+    </main>
+  </div>
+</section>

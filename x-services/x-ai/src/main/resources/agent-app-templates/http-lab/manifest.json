@@ -1,0 +1,6 @@
+{
+  "id": "http-lab",
+  "name": "HTTP 请求实验室",
+  "description": "编辑请求、查看真实响应，在浏览器调度性能测量并使用 AI 分析结果。",
+  "permissions": ["http.request", "model.generate", "storage"]
+}

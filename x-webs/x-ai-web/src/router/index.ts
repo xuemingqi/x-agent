@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
-import { applicationPages } from '@/applications/pages';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { getToken } from '@/utils/auth';
 
@@ -30,7 +29,7 @@ const router = createRouter({
           path: 'apps',
           children: [
             { path: '', name: 'apps', component: () => import('@/views/apps/AppsView.vue') },
-            ...applicationPages,
+            { path: ':appId', name: 'app-dynamic', component: () => import('@/views/apps/DynamicAppView.vue') },
           ],
         },
         {

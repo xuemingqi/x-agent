@@ -1,0 +1,6 @@
+{
+  "id": "color-lab",
+  "name": "AI 配色实验室",
+  "description": "把一句灵感变成界面配色。实时预览、锁定微调、比较方案，并导出 CSS 或 JSON。",
+  "permissions": ["model.generate", "storage"]
+}
